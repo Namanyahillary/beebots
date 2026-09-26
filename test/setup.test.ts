@@ -191,7 +191,7 @@ describe("setup", () => {
   it("refuses the official bees' names, typed by the owner", async () => {
     const t = await boot();
     t.paintAll();
-    for (const name of ["Bizzy", "breezy-bee", "Boozy Bee", "BIZZIE"]) {
+    for (const name of ["Blaze", "silver-bee", "Grim Bee", "BLAZZE"]) {
       const bees = [{ ...BEES[0]!, name }, BEES[1], BEES[2]];
       expect((await t.post("/setup/save", { ...SAVE, bees })).status).toBe(400);
     }
@@ -234,7 +234,7 @@ describe("designing a bee", () => {
   });
 
   it("refuses an official bee's name from the model, with a clear message", async () => {
-    const t = await boot({ designs: [design({ name: "Boozy Bee" })] });
+    const t = await boot({ designs: [design({ name: "Grim Bee" })] });
     const r = await t.post("/setup/design", { openaiKey: "sk-test", description: "a party bee" });
     expect(r.status).toBe(422);
     expect(((await r.json()) as { error: string }).error).toMatch(/official bees.*Create again/);
@@ -273,13 +273,13 @@ describe("finishDesign", () => {
   });
 
   it("refuses reserved names", () => {
-    expect(() => finishDesign(design({ name: "Bizzy" }), COINS)).toThrow(DesignError);
+    expect(() => finishDesign(design({ name: "Blaze" }), COINS)).toThrow(DesignError);
   });
 });
 
 describe("settings", () => {
   it("reserves the official names in their obvious spellings only", () => {
-    for (const n of ["Bizzy", "bizzy-bee", "Bizzy Bee", "BizzyBee", "BREEZY", "Breezey bee", "Boozie", "bizy"]) expect(isReservedName(n), n).toBe(true);
+    for (const n of ["Blaze", "blaze-bee", "Blaze Bee", "SILVER", "Silver bee", "Grim", "Grimm"]) expect(isReservedName(n), n).toBe(true);
     for (const n of ["Buzzy", "Beatrice", "Bee", "Boozer", "Breeze", "Donny"]) expect(isReservedName(n), n).toBe(false);
   });
 
@@ -290,7 +290,7 @@ describe("settings", () => {
       acceptedRiskAt: 1,
       createdAt: 1,
       bees: [
-        { name: "Bizzy", style: "bizzy", tagline: "the grinder", image: false },
+        { name: "Blaze", style: "bizzy", tagline: "the grinder", image: false },
         { name: "Zip", style: "boozy", tagline: "" },
         { name: "Rex", style: "boozy", tagline: "", image: true },
       ],
