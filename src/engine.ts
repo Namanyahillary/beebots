@@ -1173,9 +1173,12 @@ export class Engine {
     const mid = p ? view.tickers.get(p.instId)?.mid : undefined;
     const start = this.d.cfg.risk.startEquityUsd;
     const knobs = this.knobs(id);
+    const style = this.d.cfg.slots[id].style;
+    const triggers = this.brain(id).triggers;
     const r2 = (x: number) => Number(x.toFixed(2));
     return {
       bee: id,
+      style,
       equityUsd: r2(b.equityUsd),
       pnlUsd: r2(b.equityUsd - start),
       pnlPct: r2(((b.equityUsd - start) / start) * 100),
@@ -1203,6 +1206,7 @@ export class Engine {
       liqProxy: { ratio: this.liqLast[id] ?? null, max: this.liqMax[id] ?? null, samples: this.liqSamples[id] ?? 0 },
       maxNotionalUsd: r2(maxNotionalUsd(this.ctx(id, this.now()))),
       last: this.last[id] ?? null,
+      ...(triggers ? { triggers: [...triggers] } : {}),
     };
   }
 

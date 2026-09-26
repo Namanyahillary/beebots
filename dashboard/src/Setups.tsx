@@ -1,4 +1,5 @@
 import { memo, useMemo } from "react";
+import { Help } from "./Help";
 import { scoutAge } from "./Scout";
 import type { DecisionEvent } from "./types";
 
@@ -38,7 +39,12 @@ export const Setups = memo(function Setups({ decisions }: { decisions: DecisionE
   return (
     <section className="rail-card setups">
       <div className="rail-head">
-        <span className="eyebrow">Setups</span>
+        <span className="eyebrow">
+          Setups <Help title="Setups">
+            <p>Each row counts one trigger label over the last {WINDOW} decisions: offered means it appeared in Jev&apos;s menu, picked means Jev chose it, with the last-seen age beside it. BREAKOUT_ is the Williams trigger (today&apos;s open plus half of yesterday&apos;s range); STINGER_ is the challenger (above the previous day&apos;s high with rising volume, volZ ≥ 1.0) — both are strict long opens, and fill labels record which one earned.</p>
+            <p>WAIT counts flat-and-waiting picks, HOLD counts keep-the-position picks. An empty panel means no triggers were offered in view, not that anything is broken: bizzy only asks Jev when a price is already through its trigger.</p>
+          </Help>
+        </span>
         <span className="num dim">last {n}</span>
       </div>
       {rows.length > 0 ? (

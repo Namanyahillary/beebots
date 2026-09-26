@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { BeeColumn, money } from "./BeeColumn";
 import { Fills } from "./Fills";
 import { Header } from "./Header";
+import { Help } from "./Help";
 import { Scout } from "./Scout";
 import { Setups } from "./Setups";
 import { unlockAudio } from "./sound";
@@ -69,13 +70,19 @@ export function App() {
               rank={board.indexOf(name) + 1}
               gap={bee ? Math.max(0, leaderEq - bee.equityUsd) : null}
               flash={feed.flashes[name]}
+              fills={feed.fills}
+              decisions={feed.decisions}
             />
           );
         })}
         <aside className="rail">
           <section className="rail-card board">
             <div className="rail-head">
-              <span className="eyebrow">Leaderboard</span>
+              <span className="eyebrow">
+                Leaderboard <Help title="Leaderboard">
+                  This board ranks the three bees by current equity, widest bar wins. The public Hive board is separate and opt-in: paper trading only — a live-money engine can&apos;t join — and it shows % gain/loss only, never keys, account details or addresses. A verified badge means the server replayed that bee&apos;s fills against OKX candles and the books add up.
+                </Help>
+              </span>
               <span className="dim">equity</span>
             </div>
             {board.map((name, i) => {

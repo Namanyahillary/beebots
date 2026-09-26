@@ -1707,3 +1707,81 @@ textarea.setup-input {
   border-radius: 50%;
   object-fit: cover;
 }
+
+/* ---------- engine badges, help, tap-to-trades (presentational only) ---------- */
+.help-btn {
+  display: inline-grid;
+  place-items: center;
+  width: 1.05rem;
+  height: 1.05rem;
+  margin-left: 0.35rem;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: var(--card-2);
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.7rem;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  vertical-align: baseline;
+}
+.help-btn:hover {
+  color: var(--text);
+  border-color: var(--breezy);
+}
+.help-body p {
+  margin: 0.5rem 0;
+}
+.help-body p:first-child {
+  margin-top: 0;
+}
+.engine-badges {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-top: 0.3rem;
+}
+.engine-badge,
+.trigger-badge {
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 0.15rem 0.55rem;
+  border-radius: 999px;
+  border: 1px solid var(--bee);
+  color: var(--bee);
+  white-space: nowrap;
+}
+.trigger-badge {
+  border-style: dashed;
+}
+.trades-btn {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  border-radius: 0.5rem;
+}
+.trades-btn:hover .meter-head .num {
+  color: var(--text);
+}
+.trades-btn:focus-visible {
+  outline: 2px solid var(--bee);
+  outline-offset: 2px;
+}
+.bee-fills-list {
+  max-height: 60vh;
+  overflow-y: auto;
+}
+.bee-fills-list .fill-row {
+  grid-template-columns: 1fr auto auto;
+}

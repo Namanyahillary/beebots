@@ -1,5 +1,9 @@
+import { useEffect, useState } from "react";
 import { EquityChart } from "./EquityChart";
-import { BEE_META, type BeeName, type PublicBee } from "./types";
+import { Help } from "./Help";
+import { scoutAge } from "./Scout";
+import { TradeModal } from "./TradeModal";
+import { BEE_META, type BeeName, type DecisionEvent, type FillEvent, type PublicBee } from "./types";
 import type { Curve, FeedState } from "./useFeed";
 
 const CAP_LABEL: Record<string, string> = { trade_cap: "BENCHED", fee_budget: "BENCHED", loss_stop: "SENT HOME", retired: "RETIRED" };
@@ -58,13 +62,53 @@ interface Props {
   rank: number;
   gap: number | null;
   flash: FeedState["flashes"][BeeName];
+  fills?: FillEvent[];
+  decisions?: DecisionEvent[];
 }
 
-export function BeeColumn({ name, bee, curve, baseline, rank, gap, flash }: Props) {
+const STYLE_LABEL: Record<string, string> = { bizzy: "Breakout", breezy: "Trend", boozy: "Momentum" };
+const DEFAULT_STYLE: Record<BeeName, string> = { bee1: "bizzy", bee2: "breezy", bee3: "boozy" };
+
+function EngineHelp({ styleId }: { styleId: string }) {
+  if (styleId === "breezy")
+    return (
+      <Help title="Engine: Trend">
+        <p>The badge names the strategy this slot runs — trend following on BTC and ETH with a 9-slice Donchian ensemble on 4h bars — and describes capability, so it always shows, even before any data arrives.</p>
+        <p>Take-profit: at +1R the stop moves to breakeven (0.1R past fees), at +2R it trims half; a score decay of 3 also trims half.</p>
+      </Help>
+    );
+  if (styleId === "boozy")
+    return (
+      <Help title="Engine: Momentum">
+        <p>The badge names the strategy this slot runs — momentum rotation into the week&apos;s hottest coin, pyramiding winners up to 2x — and describes capability, so it always shows, even before any data arrives.</p>
+        <p>Take-profit: at +1R the stop moves to breakeven (0.1R past fees) with no trim; rotation unlocks after 24 hours behind a 3× ATR(1h) trail.</p>
+      </Help>
+    );
+  return (
+    <Help title="Engine: Breakout">
+      <p>The badge names the strategy this slot runs — one volatility breakout a day on BTC, ETH, SOL or HYPE — and describes capability, so it always shows, even before any data arrives.</p>
+      <p>Take-profit: at +1R the stop moves to breakeven (0.1R past fees) with no trim; the position rides to the UTC day close.</p>
+    </Help>
+  );
+}
+
+export function BeeColumn({ name, bee, curve, baseline, rank, gap, flash, fills, decisions }: Props) {
   const meta = BEE_META[name];
   const p = bee?.position ?? null;
   const flashing = flash && Date.now() - flash.at < 2500;
   const cap = bee?.cap ?? null;
+  const styleId = bee?.style ?? DEFAULT_STYLE[name]!;
+  const styleLabel = STYLE_LABEL[styleId] ?? meta.styleLabel;
+  const [showFills, setShowFills] = useState(false);
+  const [sel, setSel] = useState<FillEvent | null>(null);
+  const beeFills = (fills ?? []).filter((f) => f.bee === name);
+
+  useEffect(() => {
+    if (!showFills || sel) return;
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setShowFills(false);
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [showFills, sel]);
 
   return (
     <section className={`bee ${flashing ? `flash-${flash.kind}` : ""}`} style={{ ["--bee" as string]: meta.color, ["--bee-glow" as string]: meta.glow }}>
@@ -78,6 +122,16 @@ export function BeeColumn({ name, bee, curve, baseline, rank, gap, flash }: Prop
             {meta.tagline || meta.styleLabel}
             {meta.coins.length > 0 && <span className="bee-coins"> · {meta.coins.join(" ")}</span>}
             {meta.tagline && <span className="bee-style"> · {meta.styleLabel}</span>}
+          </div>
+          <div className="engine-badges">
+            <span className="engine-badge">{styleLabel}</span>
+            {styleId === "bizzy" && (
+              <>
+                <span className="trigger-badge">BREAKOUT</span>
+                <span className="trigger-badge">STINGER</span>
+              </>
+            )}
+            <EngineHelp styleId={styleId} />
           </div>
           {meta.rules && (
             <div className="bee-rules" title={meta.rules}>
@@ -145,7 +199,9 @@ export function BeeColumn({ name, bee, curve, baseline, rank, gap, flash }: Prop
       </div>
 
       <div className="meters">
-        <Meter label="Trades today" value={bee?.tradesToday ?? 0} max={bee?.maxTradesPerDay ?? 1} text={`${bee?.tradesToday ?? 0} / ${bee?.maxTradesPerDay ?? "–"}`} />
+        <button type="button" className="trades-btn" onClick={() => { setSel(null); setShowFills(true); }} title={`${meta.short} fills`}>
+          <Meter label="Trades today" value={bee?.tradesToday ?? 0} max={bee?.maxTradesPerDay ?? 1} text={`${bee?.tradesToday ?? 0} / ${bee?.maxTradesPerDay ?? "–"}`} />
+        </button>
         <Meter label="Fee budget" value={bee?.feesTodayUsd ?? 0} max={bee?.feeBudgetUsd ?? 1} text={`${money(bee?.feesTodayUsd ?? 0)} / ${money(bee?.feeBudgetUsd ?? 0)}`} />
       </div>
 
@@ -169,6 +225,39 @@ export function BeeColumn({ name, bee, curve, baseline, rank, gap, flash }: Prop
       </div>
 
       {flashing && flash.kind === "funding" && <div className="funding-chip num">{flash.text}</div>}
+
+      {showFills && !sel && (
+        <div className="modal-back" onClick={(e) => e.target === e.currentTarget && setShowFills(false)}>
+          <div className="modal" role="dialog" aria-modal="true" aria-labelledby={`fills-${name}`}>
+            <button className="modal-x" onClick={() => setShowFills(false)} aria-label="Close">
+              ×
+            </button>
+            <h2 id={`fills-${name}`}>{meta.short} fills</h2>
+            {beeFills.length > 0 ? (
+              <div className="fills-list bee-fills-list">
+                {beeFills.map((f) => (
+                  <button
+                    key={`${f.ts}-${f.bee}-${f.coin}-${f.contracts}-${f.px}`}
+                    type="button"
+                    className="fill-row"
+                    style={{ ["--bee" as string]: meta.color }}
+                    onClick={() => setSel(f)}
+                  >
+                    <span className="fill-main">
+                      {f.side === "buy" ? "▲" : "▼"} {f.coin} <span className="dim">×{f.contracts}</span>
+                    </span>
+                    <span className="fill-purpose dim">{f.purpose}</span>
+                    <span className="dim">{scoutAge(f.ts, Date.now())}</span>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <p className="dim">no fills yet — flat/waiting</p>
+            )}
+          </div>
+        </div>
+      )}
+      {sel && <TradeModal fill={sel} decisions={decisions ?? []} onClose={() => setSel(null)} />}
     </section>
   );
 }

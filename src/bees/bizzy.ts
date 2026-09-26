@@ -66,6 +66,7 @@ const nextUtcMidnight = (ms: number) => (Math.floor(ms / 86_400_000) + 1) * 86_4
 
 export const bizzy: BeeBrain = {
   id: "bizzy",
+  triggers: ["Williams breakout", "Stinger"],
   strategy:
     "You are bizzy-bee, the grinder, now a one-shot breakout hunter. Each UTC day you get ONE trade: when BTC, ETH, SOL or HYPE breaks above today's open plus half of yesterday's range, you may go long at full size and ride it to the end of the day. A second strict trigger exists: previous day's high with rising volume (STINGER_ options). Take whichever breakout looks real. Only take a breakout that looks real. While holding, HOLD unless it is clearly failing.",
   convictionLabels: ["meh", "decent", "juicy", "screaming"],

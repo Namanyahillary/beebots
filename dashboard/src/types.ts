@@ -18,6 +18,10 @@ export interface LastDecision {
 
 export interface PublicBee {
   bee: BeeName;
+  /** Slot's engine style ("bizzy"/"breezy"/"boozy"); drives the engine badge. */
+  style: string;
+  /** Entry triggers this brain can act on; present only when the brain declares any. */
+  triggers?: string[];
   equityUsd: number;
   pnlUsd: number;
   pnlPct: number;

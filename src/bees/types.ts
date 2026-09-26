@@ -95,6 +95,8 @@ export interface BeeBrain {
   id: StyleId;
   /** Condensed from strategies/<BEE>.md; sent to Jev as the question instructions. */
   strategy: string;
+  /** Entry triggers this brain can act on (capability label for the dashboard; no trading effect). */
+  triggers?: string[];
   convictionLabels: readonly [string, string, string, string];
   /** instIds this bee may open right now (already gated). */
   universe(ctx: BeeContext): string[];

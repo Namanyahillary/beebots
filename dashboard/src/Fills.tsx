@@ -1,4 +1,5 @@
 import { memo, useState } from "react";
+import { Help } from "./Help";
 import { scoutAge } from "./Scout";
 import { TradeModal } from "./TradeModal";
 import { BEE_META, type DecisionEvent, type FillEvent } from "./types";
@@ -25,7 +26,11 @@ export function Fills({ fills, decisions }: { fills: FillEvent[]; decisions: Dec
   return (
     <section className="rail-card fills">
       <div className="rail-head">
-        <span className="eyebrow">Fills</span>
+        <span className="eyebrow">
+          Fills <Help title="Fills">
+            Recent fills, newest first — clicking a row opens the trade: the fill&apos;s price, size, fee and P&amp;L plus the decision behind it. The decision is linked by id when available, otherwise the nearest same-bee decision within 60 seconds. A fill with nothing nearby in the current view simply shows none in view.
+          </Help>
+        </span>
         <span className="num dim">{rows.length > 0 ? `${rows.length} recent` : "none yet"}</span>
       </div>
       {rows.length > 0 ? (

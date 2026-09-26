@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { money, signed } from "./BeeColumn";
+import { Help } from "./Help";
 import { HiveButton } from "./Hive";
 import { PROFILE, type Snapshot } from "./types";
 
@@ -43,10 +44,13 @@ function HostingerMark() {
   );
 }
 
-function Counter({ label, value, sub, tone }: { label: string; value: string; sub?: string; tone?: "good" | "bad" }) {
+function Counter({ label, value, sub, tone, help }: { label: string; value: string; sub?: string; tone?: "good" | "bad"; help?: ReactNode }) {
   return (
     <div className="counter">
-      <div className="eyebrow">{label}</div>
+      <div className="eyebrow">
+        {label}
+        {help && <> {help}</>}
+      </div>
       <div className={`counter-value num ${tone ?? ""}`}>{value}</div>
       {sub && <div className="counter-sub num">{sub}</div>}
     </div>
@@ -88,6 +92,11 @@ export function Header({ snap, connected, stalled, soundOn, onSound }: { snap: S
           label="Jev spend"
           value={t ? money(t.jevUsd, 4) : "–"}
           sub={jev ? `today ${money(jev.spentTodayUsd, 3)} of ${money(jev.dailyCapUsd, 0)} cap` : undefined}
+          help={
+            <Help title="Jev calls">
+              Made counts real Jev API calls; skipped counts ticks where the cached answer was reused — same menu, market state, leader, position, cap and data freshness, within the heartbeat tick window — instead of paying for a new call. Saved is skipped × average call cost, an estimate of what the cache avoided. Only the API call is ever skipped: stops, caps, vetoes and take-profit still run in code every tick, and a spent daily cap or unreachable Jev means holding.
+            </Help>
+          }
         />
         <Counter label="Decisions" value={decisions.toLocaleString()} sub={jev?.down ? "Jev unreachable: holding" : jev?.capTripped ? "Jev cap hit: holding" : "every one recorded"} tone={jev?.down || jev?.capTripped ? "bad" : undefined} />
         <Counter label="Visitors" value={snap?.visitors ? snap.visitors.total.toLocaleString() : "–"} sub={snap?.visitors ? `${snap.visitors.watching} watching now` : undefined} />
