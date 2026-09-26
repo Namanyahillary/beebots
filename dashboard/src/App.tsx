@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { BeeColumn, money } from "./BeeColumn";
 import { Header } from "./Header";
+import { Scout } from "./Scout";
 import { unlockAudio } from "./sound";
 import { Ticker } from "./Ticker";
 import { Toasts } from "./Toasts";
@@ -92,6 +93,7 @@ export function App() {
             })}
           </section>
           <Ticker decisions={feed.decisions} perMin={feed.decisionTimes.length} />
+          <Scout scout={feed.snap?.scout} />
           {blocked.length > 0 && (
             <section className="rail-card blocked">
               <span className="eyebrow">Spread gate says no</span>

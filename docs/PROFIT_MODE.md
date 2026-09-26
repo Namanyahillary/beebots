@@ -1,0 +1,107 @@
+# Profit Mode — `future/profit-mode`
+
+Philosophy: gain and exit with no emotion. Trail gains, take profits mechanically,
+scout new opportunities continuously. Entertainment behaviors (forced entries, riding
+winners into losers) are instrumented, gated, or removed — never silent.
+
+Status: built on branch `future/profit-mode`, all green (typecheck + lint + 234 tests).
+NOT deployed. Merge + deploy is the owner's call after paper observation.
+
+## What changed and why
+
+### 1. JEV waste gate (reuse-last-answer)
+Was: ~40k JEV calls/day → ~8 orders. Now: `risk.ts` runs every tick (stops, caps,
+vetoes all still fire in code); only the JEV *API call* is skipped when menu + material
+state are unchanged, reusing the last answer while fresh. Heartbeat forces a real call
+(≥ every 12 ticks) so outage detection keeps working. Per-bee counters: calls made /
+skipped / est. $ saved, visible in snapshot. Invalidates on: menu change, top-score
+flip, funding/spread-gate flips, uplR move, position/cap/staleness change. Failures
+never populate the cache. See `src/engine.ts` (cache + `storeScoutIfChanged` neighbor).
+
+### 2. Take-profit ladder + breakeven stops (per-brain opt-in, never universal)
+Pure `takeProfitSignal()` in `risk.ts`, wired post-risk in the engine through existing
+order paths (trim folds into `trim` with `forcedBy: take_profit`). One-shot flags
+(`trimmedAtR`, `beMoved`) persisted across reconcile. Rules:
+- breezy (trend, rides winners): trim half at +2R, breakeven (+0.1R buffer) at +1R.
+- boozy (pyramids into winners): breakeven-move ONLY — a trim would fight the pyramid.
+- bizzy (one-shot grind): breakeven-move ONLY — a trim would cut the ride short.
+- BE fires only after trim fills where both configured; stop moves ratchet, never loosen.
+- Benched path: BE-move only, no trims.
+
+### 3. Ledger fix (prerequisite, not optional)
+`riskUsd` now scales UP on adds (was only scaled down on reduces), so `uplR` stays
+correct through pyramids. Without this, every R-based trigger misfired after an add.
+Test: open→add→trim sequence asserts uplR == 1R.
+
+### 4. Ghost benchmark (caged)
+Deterministic shadow chooser (best strict-setup score when flat, else hold), post-risk,
+read-only, sampled every 6th tick into separate `ghost_decisions` table. No orders,
+fills, decisions writes, no bus events. Pre-registered metric: fee-adjusted equity
+delta vs the real bee, computed offline — the number that answers "does JEV earn it".
+
+### 5. Scout screen + opportunity visibility (log-only)
+Pure `screenUniverse()` (spread, volume, funding-data, trend-data screens). Snapshots
+persisted on eligible-set change only; dashboard "Scout" rail panel shows eligible +
+excluded-with-reasons + snapshot age (staleness is the point — a 30m-old opportunity
+may be gone). NOT wired into any `universe()` — gating awaits measured lift.
+
+### 6. Aggregate + liquidation monitors (alert-only, zero trading effect)
+Cross-bee same-instrument notional sum vs per-bee cap → warn + rate-limited alert.
+Notional/equity ratio logged per position (liq proxy). Real guards await: (a) shared-key
+deployment decision, (b) OKX margin feed.
+
+### 7. Deliberately NOT changed (measure-first)
+- `neverForce` flip on breezy/boozy: would change strategy identity; needs dry-run A/B.
+  `forcedBy` attribution already records forced fills for the comparison.
+- Scout gating universes; P5 enforcing veto; liq veto. All logged, none enforced.
+
+## Metrics to watch on paper (in order)
+1. JEV calls skipped vs made + est. $ saved per bee (snapshot).
+2. TP/BE fill counts + round-trip rate (are winners still round-tripping?).
+3. Ghost delta vs real bee per strategy.
+4. Forced-entry PnL vs chosen-entry PnL (decides the neverForce flip).
+5. Aggregate-monitor alert rate (decides whether P5 veto is needed).
+6. Liq-proxy distribution (decides whether margin feed is worth plumbing).
+
+## Considered and rejected (adversarial review)
+- **Search API key: declined.** P1–P7 are deterministic plumbing; search adds nothing
+  except one future lookup (OKX margin-field names) doable ad hoc. No standing key needed.
+- **Extra runtime LLM (OpenRouter): declined for the hot path.** Violates "JEV chooses,
+  code decides", doubles outage surface, reintroduces the cost P1 kills. Offline use
+  (drafting code, postmortem synthesis) is fine but not needed for this batch.
+- **News ingestion: declined.** Staleness risk, per-tick cost ramp, token waste; beebots
+  trades intraday momentum/trend where news edge is weakest. Narrow exception: a future
+  long-horizon/event-driven bot would need timestamped newswire (not search API), built
+  as its own validated strategy — not bolted onto these bees.
+- **Scout-as-4th-bot: rejected** (breaks the 3-bee invariant across engine/creds/ledger).
+  Pure function instead. **P5 veto: rejected** (net-mode + per-bee books don't mix
+  without a reconcile redesign); alert-only stands.
+
+## Stinger setup (copied rules, encoded as machinery — not pasted as words)
+Hive leader "Skywing Stinger" (+3.97% on 1 trade — statistically meaningless, copy the
+structure not the ranking): prev-day-high breakout + rising volume, long-only, quick
+cut, trail till fade. Implemented as a deterministic *challenger* trigger in bizzy
+(`stingerSetup`, `STINGER_MIN_VOL_Z = 1.0` starting guess): strict long only when
+`mid > prevHigh` (new field from existing 1h candles) AND `volZ >= 1.0`. Separate
+`STINGER_<COIN>` menu labels vs `BREAKOUT_<COIN>` so fills attribute Williams vs
+Stinger triggers against each other. Williams trigger untouched (control). AVAX
+deliberately NOT added (universe/feed change — needs readiness review first).
+## Rollout suggestion
+Paper-observe ≥ 7 days: metrics 1–6 above. Promote per item on evidence, never as a
+bundle. TP/BE numbers are per-brain constants — retune from fills, not theory.
+
+## Second-eyes review (Gemini, incorporated)
+An independent review returned APPROVE-WITH-FIXES and caught one genuine BLOCKER plus
+six smaller items — all fixed on this branch before merge:
+- **BLOCKER (fixed): JEV-discretionary trims repeated on cached ticks.** `posKey` omitted
+  contracts and the cache survived fills, so a TRIM_HALF answer replayed every 10s until
+  the position drained. Fix: contracts in `posKey` + cache deleted on any executed
+  action (next tick always asks afresh after a fill). Regression test: full `decide()`
+  ticks with an always-trim fake — tick 2 must be a fresh call.
+- Min-size TP trim looping as a no-op → marked spent instead of emitted.
+- Outage-probe calls now counted in `jevMade` (dashboard numbers reconcile).
+- `JEV_HEARTBEAT_TICKS` documented in `.env.example`; dashboard types completed;
+  unused `mid` param removed from `takeProfitSignal`.
+- Residual note (not fixed, by design): a *fresh* JEV re-pick of TRIM_HALF on consecutive
+  ticks is JEV's judgment on fresh state — same as pre-branch behavior, not a cache bug.
+  If fills show trim-churn, consider a one-shot decay-trim or trim cooldown next.

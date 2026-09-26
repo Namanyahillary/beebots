@@ -218,7 +218,7 @@ export class MarketFeed {
 export const BREAKOUT_K = 0.5;
 
 /** Today's UTC-day open and yesterday's full range from 1h candles; null until a full previous day is available. */
-export function breakoutLevels(c1h: Candle[], now: number, k: number): { dayOpen: number; prevRange: number; trigger: number } | null {
+export function breakoutLevels(c1h: Candle[], now: number, k: number): { dayOpen: number; prevRange: number; trigger: number; prevHigh: number } | null {
   const day = 86_400_000;
   const t0 = Math.floor(now / day) * day;
   const sorted = [...c1h].sort((a, b) => a.ts - b.ts);
@@ -227,5 +227,6 @@ export function breakoutLevels(c1h: Candle[], now: number, k: number): { dayOpen
   if (!today.length || prev.length < 20) return null;
   const dayOpen = today[0]!.o;
   const prevRange = Math.max(...prev.map((c) => c.h)) - Math.min(...prev.map((c) => c.l));
-  return { dayOpen, prevRange, trigger: dayOpen + k * prevRange };
+  const prevHigh = Math.max(...prev.map((c) => c.h));
+  return { dayOpen, prevRange, trigger: dayOpen + k * prevRange, prevHigh };
 }

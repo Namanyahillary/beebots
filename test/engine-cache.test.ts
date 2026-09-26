@@ -1,0 +1,234 @@
+// profit-mode: Jev answer reuse, ghost benchmark, TP/BE math, aggregate monitor.
+import { describe, expect, it } from "vitest";
+import { breezy } from "../src/bees/breezy.js";
+import type { Menu } from "../src/bees/types.js";
+import {
+  aggregateExposure,
+  breakevenStopPx,
+  cacheReusable,
+  ghostPick,
+  menuHashFor,
+  posKeyFor,
+  stateHashFor,
+  topIdFor,
+  type CacheNow,
+  type JevCacheEntry,
+} from "../src/engine.js";
+import { bee, coin, ctx, NOW, position, testConfig, trend, view } from "./fixtures.js";
+
+const SOL = coin("SOL");
+const BTC = coin("BTC", { trend: trend({ score: 5 }) }, 80000);
+const V = view([SOL, BTC]);
+
+function entry(over: Partial<JevCacheEntry> = {}): JevCacheEntry {
+  return {
+    choice: "HOLD_WINNER",
+    conviction: 2,
+    convictionRaw: 2.1,
+    prob: 0.8,
+    confidence: 0.8,
+    probabilities: { HOLD_WINNER: 0.8 },
+    menuHash: "m",
+    stateHash: "s",
+    topId: "t",
+    posKey: "flat",
+    cap: null,
+    stale: false,
+    askedAtTick: 10,
+    ...over,
+  };
+}
+
+const cur = (over: Partial<CacheNow> = {}): CacheNow => ({
+  menuHash: "m",
+  stateHash: "s",
+  topId: "t",
+  posKey: "flat",
+  cap: null,
+  stale: false,
+  ...over,
+});
+
+describe("menuHashFor", () => {
+  const menu = (label: string): Menu => ({ [label]: { desc: null, intent: { kind: "open", instId: SOL.instId, side: "long", sizeFrac: 0.5, setup: "strict" } } });
+  it("is stable under key order", () => {
+    const a: Menu = { ...menu("A"), ...menu("B") };
+    const b: Menu = { ...menu("B"), ...menu("A") };
+    expect(menuHashFor(a)).toBe(menuHashFor(b));
+  });
+  it("changes when an intent kind, target or setup changes", () => {
+    const base = menuHashFor(menu("A"));
+    const switched: Menu = { A: { desc: null, intent: { kind: "switch", instId: SOL.instId, side: "long", sizeFrac: 0.5, setup: "strict" } } };
+    const loose: Menu = { A: { desc: null, intent: { kind: "open", instId: SOL.instId, side: "long", sizeFrac: 0.5, setup: "loose" } } };
+    const other: Menu = { A: { desc: null, intent: { kind: "open", instId: BTC.instId, side: "long", sizeFrac: 0.5, setup: "strict" } } };
+    expect(menuHashFor(switched)).not.toBe(base);
+    expect(menuHashFor(loose)).not.toBe(base);
+    expect(menuHashFor(other)).not.toBe(base);
+  });
+});
+
+describe("stateHashFor", () => {
+  it("ignores mid moves but reacts to score, uplR, cap and position changes", () => {
+    const b = bee("breezy");
+    const base = stateHashFor(ctx("breezy", b, V));
+    const moved = view([coin("SOL", {}, 105), BTC]);
+    expect(stateHashFor(ctx("breezy", b, moved))).toBe(base);
+    const scored = view([coin("SOL", { trend: trend({ score: 9 }) }), BTC]);
+    expect(stateHashFor(ctx("breezy", b, scored))).not.toBe(base);
+    const capped = bee("breezy", { cap: "trade_cap", tradesToday: 3 });
+    expect(stateHashFor(ctx("breezy", capped, V))).not.toBe(base);
+    const pos = bee("breezy", { position: position(SOL), flatSince: null });
+    expect(stateHashFor(ctx("breezy", pos, V))).not.toBe(base);
+  });
+  it("rounds uplR: dust does not bust the cache, a real move does", () => {
+    const lo = bee("breezy", { position: position(SOL, { riskUsd: 10 }), uplUsd: 1.44, flatSince: null });
+    const lo2 = bee("breezy", { position: position(SOL, { riskUsd: 10 }), uplUsd: 1.46, flatSince: null });
+    const hi = bee("breezy", { position: position(SOL, { riskUsd: 10 }), uplUsd: 2.5, flatSince: null });
+    expect(stateHashFor(ctx("breezy", lo2, V))).toBe(stateHashFor(ctx("breezy", lo, V)));
+    expect(stateHashFor(ctx("breezy", hi, V))).not.toBe(stateHashFor(ctx("breezy", lo, V)));
+  });
+});
+
+describe("cacheReusable", () => {
+  it("reuses within the heartbeat and expires at it", () => {
+    expect(cacheReusable(entry(), cur(), 0, 12)).toBe(true);
+    expect(cacheReusable(entry(), cur(), 11, 12)).toBe(true);
+    expect(cacheReusable(entry(), cur(), 12, 12)).toBe(false);
+  });
+  it("invalidates on menu/state/top/position/cap/stale changes", () => {
+    expect(cacheReusable(entry(), cur({ menuHash: "x" }), 0, 12)).toBe(false);
+    expect(cacheReusable(entry(), cur({ stateHash: "x" }), 0, 12)).toBe(false);
+    expect(cacheReusable(entry(), cur({ topId: "flip" }), 0, 12)).toBe(false);
+    expect(cacheReusable(entry(), cur({ posKey: "open" }), 0, 12)).toBe(false);
+    expect(cacheReusable(entry(), cur({ cap: "trade_cap" }), 0, 12)).toBe(false);
+    expect(cacheReusable(entry(), cur({ stale: true }), 0, 12)).toBe(false);
+  });
+});
+
+describe("posKeyFor / topIdFor", () => {
+  it("flat vs positioned vs flipped", () => {
+    expect(posKeyFor(ctx("breezy", bee("breezy"), V))).toBe("flat");
+    const p = bee("breezy", { position: position(SOL), flatSince: null });
+    expect(posKeyFor(ctx("breezy", p, V))).toBe(`${SOL.instId}:long:100`);
+  });
+  it("top is the bee's own universe head", () => {
+    expect(topIdFor(breezy, ctx("breezy", bee("breezy"), V))).toBe(breezy.universe(ctx("breezy", bee("breezy"), V))[0]);
+  });
+});
+
+describe("ghostPick (caged, deterministic)", () => {
+  const menu: Menu = {
+    LONG_BTC: { desc: null, intent: { kind: "open", instId: BTC.instId, side: "long", sizeFrac: 0.5, setup: "strict" } },
+    LONG_SOL: { desc: null, intent: { kind: "open", instId: SOL.instId, side: "long", sizeFrac: 0.5, setup: "strict" } },
+    HOLD_WINNER: { desc: null, intent: { kind: "hold" } },
+  };
+  it("picks the highest-|score| strict open when flat", () => {
+    const pick = ghostPick(breezy, ctx("breezy", bee("breezy"), V, testConfig()), menu);
+    expect(pick).toMatchObject({ choice: "LONG_BTC", reason: "ghost_top_score" });
+  });
+  it("holds when positioned and reports no setup when flat without strict opens", () => {
+    const p = bee("breezy", { position: position(SOL), flatSince: null });
+    expect(ghostPick(breezy, ctx("breezy", p, V), menu)).toMatchObject({ choice: "hold", reason: "ghost_hold_position" });
+    const loose: Menu = { X: { desc: null, intent: { kind: "hold" } } };
+    expect(ghostPick(breezy, ctx("breezy", bee("breezy"), V), loose)).toMatchObject({ choice: null, reason: "ghost_no_strict_setup" });
+  });
+});
+
+describe("breakevenStopPx", () => {
+  it("entry ± feeBufferR in R, favourably", () => {
+    // risk $10 over 100 contracts x ctVal 1/100 @ $100 → 1R = $10 price move.
+    const s = coin("SOL");
+    const v = view([s]);
+    const ctVal = v.instruments.get(s.instId)!.ctVal;
+    const long = position(s, { side: "long", entryPx: 100, riskUsd: 10, contracts: 100 });
+    const short = position(s, { side: "short", entryPx: 100, riskUsd: 10, contracts: 100 });
+    expect(breakevenStopPx(long, ctVal, 0.1)).toBeCloseTo(101, 8);
+    expect(breakevenStopPx(short, ctVal, 0.1)).toBeCloseTo(99, 8);
+  });
+  it("null when 1R has no price meaning", () => {
+    const p = position(SOL, { riskUsd: 0 });
+    expect(breakevenStopPx(p, 0.01, 0.1)).toBeNull();
+  });
+});
+
+describe("aggregateExposure", () => {
+  it("sums open notional per instrument across bees", () => {
+    const cfg = testConfig();
+    const v = view([SOL, BTC]);
+    const b1 = bee("bee1", { position: position(SOL, { contracts: 100 }), flatSince: null });
+    const b2 = bee("bee2", { position: position(SOL, { contracts: 50 }), flatSince: null });
+    const rows = aggregateExposure([b1, b2, bee("bee3")], v);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!.bees).toBe(2);
+    expect(rows[0]!.notionalUsd).toBeCloseTo(150, 5);
+    expect(cfg.risk.maxNotionalUsdPerBee).toBe(700);
+  });
+});
+
+
+describe("no trim repeat from stale cache after execution (Finding 1)", () => {
+  // Full decide() ticks against a fake Jev. bee2 runs breezy with a decayed
+  // trend score (entryScore 5 → score 1), so TRIM_HALF is on the menu.
+  async function harness(choice: string, score = 1, contracts = 100) {
+    const { Db } = await import("../src/db.js");
+    const { EventBus } = await import("../src/events.js");
+    const { SimExecutor } = await import("../src/exec/executor.js");
+    const { Engine } = await import("../src/engine.js");
+    const { Jev } = await import("../src/jev.js");
+    const { Alerts } = await import("../src/alerts.js");
+    const cfg = testConfig();
+    const db = new Db(":memory:");
+    const bus = new EventBus(db);
+    const btc = coin("BTC", { trend: trend({ score }) }, 80000);
+    const V = view([btc]);
+    const feed = { view: () => V, lastRefreshAt: NOW } as never;
+    const answers = {
+      action: { type: "choice", choice, confidence: 1, probabilities: { [choice]: 1 } },
+      conviction: { type: "score", score: 3, confidence: 0.5, legend: {}, probabilities: {} },
+    };
+    const jev = new Jev({
+      apiKey: "k", model: "m", timeoutMs: 2000, dailyUsdCap: 5, usdPerMTok: 0.042,
+      client: { async systemOne() { return { model: "m", usage: { input_tokens: 100, output_tokens: 0 }, answers } as never; } },
+      now: () => NOW,
+    });
+    const exec = new SimExecutor(() => ({ tickers: V.tickers, instruments: V.instruments }), 0.0005, () => NOW);
+    const engine = new Engine({ cfg, db, feed, jev, exec, bus, alerts: new Alerts(undefined), now: () => NOW });
+    const b = bee("breezy", { uplUsd: 0 });
+    b.position = position(btc, { contracts, entryScore: 5, riskUsd: 10, stopPx: null });
+    engine.bees["bee2"] = b;
+    type E = { decide(id: string, now: number): Promise<void>; jevMade: Record<string, number>; jevCache: Record<string, unknown> };
+    const e = engine as unknown as E;
+    return { b, decide: (t: number) => e.decide("bee2", t), made: () => e.jevMade["bee2"] ?? 0, cache: () => e.jevCache["bee2"] };
+  }
+
+  it("posKey changes when contracts change", () => {
+    const s = coin("SOL");
+    const v = view([s]);
+    const b = bee("breezy", { position: position(s, { contracts: 100 }), flatSince: null });
+    const c = ctx("breezy", b, v);
+    const before = posKeyFor(c);
+    b.position!.contracts = 50;
+    expect(posKeyFor(c)).not.toBe(before);
+  });
+
+  it("executed trim deletes the cache; next tick asks Jev afresh", async () => {
+    const { b, decide, made, cache } = await harness("TRIM_HALF");
+    await decide(NOW);
+    expect(b.position!.contracts).toBe(50); // trim filled
+    expect(cache()).toBeUndefined(); // cache dropped on execution
+    expect(made()).toBe(1);
+    await decide(NOW + 10_000);
+    expect(made()).toBe(2); // tick 2 is a FRESH call, never a stale-cache repeat
+  });
+
+  it("unchanged hold ticks still reuse the cache (gate not over-invalidated)", async () => {
+    // Positioned at target size (no rebalance add), score aligned with entry
+    // (no TRIM_HALF): fake holds twice on identical state.
+    const { decide, made, cache } = await harness("HOLD_WINNER", 5, 700);
+    await decide(NOW);
+    expect(made()).toBe(1);
+    expect(cache()).toBeDefined();
+    await decide(NOW + 10_000);
+    expect(made()).toBe(1); // no fresh call: identical menu+state reuses the answer
+  });
+});

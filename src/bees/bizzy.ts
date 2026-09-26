@@ -37,6 +37,20 @@ export function stretchedFades(stats: CoinStats[], n: number): FadeSetup[] {
     .slice(0, n);
 }
 
+/** Stinger strict setup (challenger to the Williams trigger, not a replacement):
+ * long only when price is above the previous UTC day's high with rising volume
+ * (volZ = volume z-score). One trade/day and menu-label attribution (STINGER_ vs
+ * BREAKOUT_) let fills decide which trigger earns. minVolZ is a starting guess. */
+export const STINGER_MIN_VOL_Z = 1.0;
+
+export function stingerSetup(s: CoinStats, minVolZ = STINGER_MIN_VOL_Z): { instId: string; coin: string } | null {
+  const prevHigh = s.breakout?.prevHigh;
+  if (prevHigh == null) return null;
+  if (!(s.mid > prevHigh)) return null;
+  if ((s.volZ ?? Number.NEGATIVE_INFINITY) < minVolZ) return null;
+  return { instId: s.instId, coin: s.coin };
+}
+
 /** The breakout coins, in order of preference when several trigger on the same tick. */
 export const BIZZY_BREAKOUT_COINS = ["BTC", "ETH", "SOL", "HYPE"] as const;
 
@@ -53,7 +67,7 @@ const nextUtcMidnight = (ms: number) => (Math.floor(ms / 86_400_000) + 1) * 86_4
 export const bizzy: BeeBrain = {
   id: "bizzy",
   strategy:
-    "You are bizzy-bee, the grinder, now a one-shot breakout hunter. Each UTC day you get ONE trade: when BTC, ETH, SOL or HYPE breaks above today's open plus half of yesterday's range, you may go long at full size and ride it to the end of the day. Only take a breakout that looks real. While holding, HOLD unless it is clearly failing.",
+    "You are bizzy-bee, the grinder, now a one-shot breakout hunter. Each UTC day you get ONE trade: when BTC, ETH, SOL or HYPE breaks above today's open plus half of yesterday's range, you may go long at full size and ride it to the end of the day. A second strict trigger exists: previous day's high with rising volume (STINGER_ options). Take whichever breakout looks real. Only take a breakout that looks real. While holding, HOLD unless it is clearly failing.",
   convictionLabels: ["meh", "decent", "juicy", "screaming"],
   neverForce: true,
   // Ride to the UTC day close (1 minute before midnight).
@@ -100,6 +114,10 @@ export const bizzy: BeeBrain = {
       for (const s of breakoutStats(ctx)) {
         const t = toTrigger(s);
         if (t !== null && t <= 0) m[`BREAKOUT_${s.coin}`] = { desc: `through trigger by ${(-t).toFixed(2)}%`, intent: { kind: "open", instId: s.instId, side: "long", sizeFrac: 1, setup: "strict" } };
+        // Stinger challenger: previous day's high with rising volume. Separate
+        // label so fills attribute Williams vs Stinger triggers against each other.
+        const st = stingerSetup(s);
+        if (st) m[`STINGER_${s.coin}`] = { desc: `above prev day high ${(100 * (s.mid / s.breakout!.prevHigh! - 1)).toFixed(2)}%, volZ ${(s.volZ ?? 0).toFixed(1)}`, intent: { kind: "open", instId: s.instId, side: "long", sizeFrac: 1, setup: "strict" } };
       }
       if (Object.keys(m).length) m.WAIT = { desc: "not convinced, keep waiting", intent: { kind: "hold" } };
       return m;
@@ -123,4 +141,12 @@ export const bizzy: BeeBrain = {
     if (!b) return null;
     return side === "long" ? b.dayOpen : null;
   },
+
+  // BE-move ONLY, same pattern as boozy: bizzy is a one-shot ride-to-close
+  // grind (single breakout, held to the UTC day close), so trimming mid-day
+  // would cut the grind short. trimAtR: Infinity disables the trim
+  // (takeProfitSignal: finite uplR >= Infinity never fires; trimFirst false
+  // so BE fires on its own). BE at +1R with a 0.1R fee buffer locks a
+  // profitable grind to at worst a scratch while the day-close exit owns the top.
+  takeProfit: { trimAtR: Infinity, trimFrac: 0, breakevenAtR: 1, feeBufferR: 0.1 },
 };

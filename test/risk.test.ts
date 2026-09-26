@@ -4,7 +4,7 @@ import { bizzy } from "../src/bees/bizzy.js";
 import { boozy } from "../src/bees/boozy.js";
 import { breezy } from "../src/bees/breezy.js";
 import type { BeeBrain, BeeContext, Intent } from "../src/bees/types.js";
-import { applyRisk, evaluateCaps, type JevStatus, type Proposal, type RiskInput } from "../src/risk.js";
+import { applyRisk, evaluateCaps, takeProfitSignal, type JevStatus, type Proposal, type RiskInput } from "../src/risk.js";
 import { bee, coin, ctx, NOW, position, testConfig, trend, view } from "./fixtures.js";
 
 const open = (instId: string, side: "long" | "short" = "long", setup: "strict" | "loose" = "strict", sizeFrac = 1): Intent => ({ kind: "open", instId, side, sizeFrac, setup });
@@ -321,5 +321,44 @@ describe("stale data", () => {
     expect(run(ctx("boozy", bee("boozy"), V), boozy, prop(open(SOL.instId)), "ok", stale).vetoedBy).toBe("stale_market_data");
     const b = bee("boozy", { position: position(SOL), flatSince: null });
     expect(run(ctx("boozy", b, V), boozy, prop({ kind: "close", reason: "bail" }), "ok", stale).action.kind).toBe("close");
+  });
+});
+
+describe("takeProfitSignal (pure, per-brain opt-in)", () => {
+  const pol = { trimAtR: 1, trimFrac: 0.5, breakevenAtR: 2, feeBufferR: 0.1 };
+
+  it("returns null without a position", () => {
+    expect(takeProfitSignal(null, 5, pol)).toBeNull();
+  });
+
+  it("returns null below both thresholds", () => {
+    const p = position(SOL, { trimmedAtR: null, beMoved: false });
+    expect(takeProfitSignal(p, 0.9, pol)).toBeNull();
+  });
+
+  it("fires trim once at trimAtR and never refires", () => {
+    const p = position(SOL, { trimmedAtR: null, beMoved: false });
+    expect(takeProfitSignal(p, 1, pol)).toEqual({ trim: { fraction: 0.5 } });
+    p.trimmedAtR = 1;
+    // Same level after the trim filled: trim must not fire again (BE not yet due).
+    expect(takeProfitSignal(p, 1, pol)).toBeNull();
+    expect(takeProfitSignal(p, 1.5, pol)).toBeNull();
+  });
+
+  it("requires trim-before-BE when trimAtR <= breakevenAtR", () => {
+    const p = position(SOL, { trimmedAtR: null, beMoved: false });
+    // Above both levels but trim not yet filled: only the trim may fire.
+    expect(takeProfitSignal(p, 2.5, pol)).toEqual({ trim: { fraction: 0.5 } });
+    p.trimmedAtR = 1;
+    expect(takeProfitSignal(p, 2.5, pol)).toEqual({ moveStopToBe: true });
+    p.beMoved = true;
+    expect(takeProfitSignal(p, 5, pol)).toBeNull();
+  });
+
+  it("fires BE without waiting when BE comes first (trimAtR > breakevenAtR)", () => {
+    const beFirst = { trimAtR: 2, trimFrac: 0.25, breakevenAtR: 1, feeBufferR: 0.1 };
+    const p = position(SOL, { trimmedAtR: null, beMoved: false });
+    expect(takeProfitSignal(p, 1, beFirst)).toEqual({ moveStopToBe: true });
+    expect(takeProfitSignal(p, 2.5, beFirst)).toEqual({ trim: { fraction: 0.25 }, moveStopToBe: true });
   });
 });

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { bizzy, fadeSetup } from "../src/bees/bizzy.js";
+import { bizzy, fadeSetup, stingerSetup } from "../src/bees/bizzy.js";
 import { boozy, rankCandidates } from "../src/bees/boozy.js";
 import { breezy, breezySizeFrac } from "../src/bees/breezy.js";
 import { buildSnapshot } from "../src/snapshot.js";
@@ -167,5 +167,22 @@ describe("snapshot (phase 3 budget: < 400 tokens)", () => {
   it("contains numbers and labels, never account data", () => {
     const s = JSON.stringify(buildSnapshot(boozy, ctx("boozy", bee("boozy"), v)).state);
     expect(s).not.toMatch(/uid|subacct|key|secret/i);
+  });
+});
+
+
+describe("bizzy Stinger setup (prev-day-high + rising volume, challenger)", () => {
+  const hi = { dayOpen: 100, prevRange: 4, trigger: 102, prevHigh: 101 };
+  it("strict long only above prev high with rising volume", () => {
+    expect(stingerSetup(coin("SOL", { breakout: hi, volZ: 1.5 }, 102))).toMatchObject({ coin: "SOL" });
+    expect(stingerSetup(coin("SOL", { breakout: hi, volZ: 1.5 }, 100.5))).toBeNull(); // below high
+    expect(stingerSetup(coin("SOL", { breakout: hi, volZ: 0.2 }, 102))).toBeNull(); // thin volume
+    expect(stingerSetup(coin("SOL", { breakout: { dayOpen: 100, prevRange: 4, trigger: 102 }, volZ: 2 }, 103))).toBeNull(); // no prevHigh data
+  });
+  it("menu offers STINGER_ alongside BREAKOUT_ with separate labels for attribution", () => {
+    const s = coin("SOL", { breakout: hi, volZ: 1.5 }, 102.5);
+    const m = bizzy.menu(ctx("bizzy", bee("bizzy"), view([s])));
+    expect(m.BREAKOUT_SOL).toBeDefined(); // through Williams trigger too
+    expect(m.STINGER_SOL!.intent).toMatchObject({ kind: "open", side: "long", setup: "strict" });
   });
 });

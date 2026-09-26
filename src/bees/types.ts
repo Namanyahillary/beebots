@@ -18,6 +18,18 @@ export interface Position {
   riskUsd: number;
   /** breezy: ensemble score at entry, for TRIM_HALF. */
   entryScore?: number;
+  /** R-multiple at which a take-profit trim fired (null = not yet triggered; persisted, survives reconcile). */
+  trimmedAtR?: number | null;
+  /** True once the stop has been moved to breakeven (false = not yet triggered; persisted, survives reconcile). */
+  beMoved?: boolean;
+}
+
+/** Per-brain opt-in take-profit / breakeven policy (R-multiples; never universal). */
+export interface TakeProfitPolicy {
+  trimAtR: number;
+  trimFrac: number;
+  breakevenAtR: number;
+  feeBufferR: number;
 }
 
 export type CapReason = "trade_cap" | "fee_budget" | "loss_stop" | "retired";
@@ -109,6 +121,8 @@ export interface BeeBrain {
   timeStopMinutes?: (ctx: BeeContext) => number;
   /** Code-side sizing: an add that brings an undersized position back to target (fires when Jev holds). */
   rebalance?: (ctx: BeeContext) => Extract<Intent, { kind: "add" }> | null;
+  /** Opt-in take-profit / breakeven policy (per-brain only, never universal). */
+  takeProfit?: TakeProfitPolicy;
   /** This bee waits for its setup instead of being forced in when flat (drama rule 2 does not apply). */
   neverForce?: boolean;
   /** Status line while flat with nothing on the menu (e.g. "waiting for a breakout"). */

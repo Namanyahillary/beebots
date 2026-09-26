@@ -54,9 +54,10 @@ export function applyFill(bee: BeeState, f: LedgerFill): number {
   if (p.instId !== f.instId) throw new Error(`fill for ${f.coin} while holding ${p.coin}`);
   const pDir = p.side === "long" ? 1 : -1;
   if (dir === pDir) {
-    // add: weighted average entry
+    // add: weighted average entry, scale risk up proportionally so uplR (= upl/riskUsd) stays correct.
     const total = p.contracts + f.contracts;
     p.entryPx = (p.entryPx * p.contracts + f.px * f.contracts) / total;
+    if (p.contracts > 0) p.riskUsd = (p.riskUsd * total) / p.contracts;
     p.contracts = total;
     return 0;
   }
@@ -89,6 +90,8 @@ function newPosition(f: LedgerFill, dir: number): Position {
     openedAt: f.ts,
     stopPx: null,
     riskUsd: 0,
+    trimmedAtR: null,
+    beMoved: false,
   };
 }
 

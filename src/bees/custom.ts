@@ -49,6 +49,8 @@ export function customBrain(base: BeeBrain, o: CustomRules): BeeBrain {
   };
 
   const coinLine = coins.length ? ` This bee only ever trades ${coins.join(", ")}.` : "";
+  // takeProfit passes through via ...base unchanged: no owner override in this
+  // pass. The designed bee keeps its base brain's trim/BE policy as-is.
   return {
     ...base,
     strategy: `${base.strategy}${rules ? ` Owner's rules for this bee (they come first, within the moves offered): ${rules}` : ""}${coinLine}`,

@@ -71,8 +71,8 @@ export interface CoinStats {
   sentiment: number | null;
   // 4h trend (breezy's coins only)
   trend?: TrendStats;
-  /** Larry Williams volatility breakout (bizzy): today's UTC open + k x yesterday's range, from 1h bars. */
-  breakout?: { dayOpen: number; prevRange: number; trigger: number } | null;
+  /** Larry Williams volatility breakout (bizzy): today's UTC open + k x yesterday's range, from 1h bars. prevHigh (previous UTC day high) supports the Stinger strict setup; absent on old/absent data. */
+  breakout?: { dayOpen: number; prevRange: number; trigger: number; prevHigh?: number | null } | null;
 }
 
 export interface TrendStats {

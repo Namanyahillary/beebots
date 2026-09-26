@@ -37,9 +37,16 @@ export interface PublicBee {
   feesTodayUsd: number;
   feeBudgetUsd: number;
   cap: Cap;
-  totals: { feesUsd: number; fundingUsd: number; jevUsd: number; realisedUsd: number; decisions: number; orders: number };
+  totals: { feesUsd: number; fundingUsd: number; jevUsd: number; realisedUsd: number; decisions: number; orders: number; jevCallsMade: number; jevCallsSkipped: number; jevSavedUsd: number };
+  liqProxy: { ratio: number | null; max: number | null; samples: number };
   maxNotionalUsd: number;
   last: LastDecision | null;
+}
+
+export interface ScoutSnapshot {
+  ts: number;
+  eligible: string[];
+  excluded: Array<{ instId: string; reasons: string[] }>;
 }
 
 export interface Snapshot {
@@ -52,9 +59,11 @@ export interface Snapshot {
   bees: PublicBee[];
   leaderboard: Array<{ bee: BeeName; equityUsd: number }>;
   totals: { feesUsd: number; fundingUsd: number; jevUsd: number; pnlUsd: number };
-  jev: { spentTodayUsd: number; dailyCapUsd: number; capTripped: boolean; down: boolean };
+  jev: { spentTodayUsd: number; dailyCapUsd: number; capTripped: boolean; down: boolean; heartbeatTicks: number; callsMade: number; callsSkipped: number; estSavedUsd: number };
   recon: { ok: boolean | null; detail: string; ts: number };
   market: { refreshedAt: number; universe: string[]; spreadBlocked: Array<{ coin: string; spreadBp: number }>; attention: "news" | "volume" };
+  /** Latest scout shortlist transition (log-only; nothing trades on it). Null until the first market refresh stores one. */
+  scout: ScoutSnapshot | null;
   visitors?: { total: number; watching: number };
   /** Set when a newer GitHub Release exists than the version this install runs. */
   update?: { current: string; latest: string } | null;

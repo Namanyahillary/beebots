@@ -2,7 +2,7 @@
 // Pure: no I/O, no clock, no randomness. Every veto, shrink and force says why.
 
 import { maxNotionalUsd, minutesSince, positionNotional } from "./bees/common.js";
-import type { Action, BeeBrain, BeeContext, CapReason, Intent } from "./bees/types.js";
+import type { Action, BeeBrain, BeeContext, CapReason, Intent, Position, TakeProfitPolicy } from "./bees/types.js";
 
 export type { Action } from "./bees/types.js";
 
@@ -244,4 +244,27 @@ export function applyRisk(input: RiskInput): RiskResult {
   }
 
   return { action, vetoedBy, forcedBy, cap, capTripped: tripped, status };
+}
+
+/**
+ * Pure take-profit / breakeven signal (per-brain opt-in; never wired here — the engine wires it).
+ * Caller owns the one-shot writes: set trimmedAtR when the trim fills, move the stop to
+ * entry ± feeBufferR in the position's favour and set beMoved when moveStopToBe fires.
+ */
+export function takeProfitSignal(
+  p: Position | null,
+  uplR: number,
+  pol: TakeProfitPolicy,
+): { trim?: { fraction: number }; moveStopToBe?: boolean } | null {
+  if (!p) return null;
+  if (!Number.isFinite(uplR)) return null;
+  const trimDue = uplR >= pol.trimAtR && p.trimmedAtR == null;
+  // When the trim level comes first, BE waits until the trim has filled.
+  const trimFirst = pol.trimAtR <= pol.breakevenAtR;
+  const beDue = uplR >= pol.breakevenAtR && !p.beMoved && (!trimFirst || p.trimmedAtR != null);
+  if (!trimDue && !beDue) return null;
+  const out: { trim?: { fraction: number }; moveStopToBe?: boolean } = {};
+  if (trimDue) out.trim = { fraction: pol.trimFrac };
+  if (beDue) out.moveStopToBe = true;
+  return out;
 }

@@ -1,8 +1,8 @@
 import { customBrain } from "./bees/custom.js";
 import { BRAINS } from "./bees/index.js";
 import { maxNotionalUsd, minutesSince, positionNotional } from "./bees/common.js";
-import { coinOf, type Action, type BeeBrain, type BeeContext, type BeeState, type Side } from "./bees/types.js";
-import { BEES, type BeeId, type Config } from "./config.js";
+import { coinOf, type Action, type BeeBrain, type BeeContext, type BeeState, type Intent, type Menu, type Position, type Side } from "./bees/types.js";
+import { BEES, STYLES, type BeeId, type Config } from "./config.js";
 import type { Alerts } from "./alerts.js";
 import type { Db } from "./db.js";
 import type { EventBus } from "./events.js";
@@ -12,8 +12,11 @@ import type { Jev, JevResult } from "./jev.js";
 import { applyFill, applyFunding, freshBee, mark, rollDay } from "./ledger.js";
 import { log } from "./log.js";
 import type { MarketFeed } from "./market/data.js";
+import type { MarketView } from "./market/types.js";
+import { createHash } from "node:crypto";
 import { safeError } from "./redact.js";
-import { applyRisk, type JevStatus, type Proposal } from "./risk.js";
+import { applyRisk, takeProfitSignal, type JevStatus, type Proposal } from "./risk.js";
+import { eligibleSetEqual, sampleExcluded, screenUniverse } from "./scout.js";
 import { buildSnapshot } from "./snapshot.js";
 
 const FUNDING_HOURS_UTC = [0, 8, 16];
@@ -21,6 +24,196 @@ const RECON_MS = 5 * 60_000;
 /** How often a benched bee gets a live P&L row in the stream. */
 const PULSE_MS = 4_000;
 const EQUITY_SNAPSHOT_MS = 10_000;
+/** Ghost benchmark + liq-proxy sampling: one row per bee every Nth tick. */
+export const GHOST_EVERY_TICKS = 6;
+export const LIQ_SAMPLE_TICKS = 6;
+/** Re-alert window for the aggregate-exposure monitor (mirrors Alerts' 10 min dedupe). */
+const AGG_ALERT_MS = 10 * 60_000;
+
+// ---------- Jev answer reuse (REUSE-LAST-ANSWER with risk-every-tick) ----------
+//
+// The waste this kills is ~40k Jev calls/day → ~8 orders. Only the Jev API call is
+// ever skipped: applyRisk still runs EVERY tick (stops, caps, spread/funding vetoes,
+// gates all fire in code), so a cached tick cannot ride a loser blind — the stop that
+// would close the position fires with or without a fresh answer.
+//
+// A tick reuses the bee's last answer only when ALL hold:
+//   - the menu is identical (same labels, same intent kinds/targets),
+//   - the rounded material state is identical (scores, uplR, fundingZ, spreadBp,
+//     position identity, cap — mid is deliberately excluded: marks move every tick),
+//   - no invalidation event (position opened/closed, cap change, fresh↔stale flip,
+//     leadership flip of the bee's own universe ranking),
+//   - fewer than HEARTBEAT_TICKS decide ticks since the last real call.
+// The heartbeat guarantees a real call at least every HEARTBEAT_TICKS ticks, so the
+// outage detector (downSince / "Jev is back") keeps working despite caching. While an
+// outage is known (jev.downSince !== null) the cache is bypassed entirely so the
+// fail-closed path runs on a live answer.
+
+const sha16 = (s: string) => createHash("sha256").update(s).digest("hex").slice(0, 16);
+const r1 = (x: number | null | undefined): number | null =>
+  x === null || x === undefined || !Number.isFinite(x) ? null : Number(x.toFixed(1));
+
+/** Sorted labels + intent kinds/targets. Size fracs rounded: equity-driven float dust must not bust the cache. */
+export function menuHashFor(menu: Menu): string {
+  const norm = Object.keys(menu)
+    .sort()
+    .map((label) => {
+      const i = menu[label]!.intent;
+      const frac = (x: number) => Number(x.toFixed(3));
+      switch (i.kind) {
+        case "open":
+        case "switch":
+          return [label, i.kind, i.instId, i.side, frac(i.sizeFrac), i.setup];
+        case "add":
+          return [label, i.kind, frac(i.sizeFrac)];
+        case "trim":
+          return [label, i.kind, frac(i.fraction)];
+        case "close":
+          return [label, i.kind, i.reason];
+        case "hold":
+          return [label, i.kind];
+      }
+    });
+  return sha16(JSON.stringify(norm));
+}
+
+/**
+ * Rounded material vars. Deliberately EXCLUDES mid/last (marks move every tick; the
+ * stop logic in risk.ts watches exits in code) and wall-clock held/flat minutes
+ * (time stops and max-flat forcing run in code every tick regardless of the answer).
+ */
+export function stateHashFor(ctx: BeeContext): string {
+  const coins = [...ctx.view.stats.values()]
+    .sort((a, b) => (a.instId < b.instId ? -1 : 1))
+    .map((s) => [s.coin, s.trend?.score ?? null, r1(s.fundingZ), r1(s.spreadBp)]);
+  const p = ctx.bee.position;
+  return sha16(
+    JSON.stringify({
+      coins,
+      news: ctx.view.newsAvailable,
+      uplR: r1(ctx.uplR),
+      pos: p ? `${p.side}:${p.coin}` : "flat",
+      cap: ctx.bee.cap,
+    }),
+  );
+}
+
+/** "flat" or instId:side:contracts — any fill (open/add/trim/close) invalidates the cache. */
+export function posKeyFor(ctx: BeeContext): string {
+  const p = ctx.bee.position;
+  return p ? `${p.instId}:${p.side}:${p.contracts}` : "flat";
+}
+
+/** The bee's own ranking top (same notion rankBoozyHourly uses). A flip means leadership changed. */
+export function topIdFor(brain: BeeBrain, ctx: BeeContext): string | null {
+  return brain.universe(ctx)[0] ?? null;
+}
+
+export interface JevCacheEntry {
+  choice: string;
+  conviction: number;
+  convictionRaw: number;
+  prob: number;
+  confidence: number;
+  probabilities: Record<string, number>;
+  menuHash: string;
+  stateHash: string;
+  topId: string | null;
+  posKey: string;
+  cap: string | null;
+  stale: boolean;
+  askedAtTick: number;
+}
+
+export interface CacheNow {
+  menuHash: string;
+  stateHash: string;
+  topId: string | null;
+  posKey: string;
+  cap: string | null;
+  stale: boolean;
+}
+
+export function cacheReusable(entry: JevCacheEntry, cur: CacheNow, ticksSinceAsk: number, heartbeatTicks: number): boolean {
+  return (
+    ticksSinceAsk < heartbeatTicks &&
+    entry.menuHash === cur.menuHash &&
+    entry.stateHash === cur.stateHash &&
+    entry.topId === cur.topId &&
+    entry.posKey === cur.posKey &&
+    entry.cap === cur.cap &&
+    entry.stale === cur.stale
+  );
+}
+
+/**
+ * Ghost benchmark chooser (caged): highest-|score| strict-setup open when flat, hold
+ * otherwise. Read-only and deterministic — same market snapshot, same pick. Never
+ * executed, never persisted outside ghost_decisions, never emitted on the bus.
+ *
+ * PRE-REGISTERED METRIC (offline, NOT in the tick path): fee-adjusted equity delta vs
+ * the real bee = (ghost replay equity incl. simulated taker fees) − bee.equityUsd,
+ * computed by an offline job replaying ghost_decisions. The tick path only records picks.
+ */
+export function ghostPick(brain: BeeBrain, ctx: BeeContext, menu: Menu): { choice: string | null; reason: string; detail: unknown } {
+  void brain; // The pick reads the menu the brain built; scoring below is intentionally brain-agnostic.
+  const p = ctx.bee.position;
+  if (p) return { choice: "hold", reason: "ghost_hold_position", detail: { coin: p.coin, side: p.side } };
+  const cands = Object.entries(menu)
+    .filter(([, o]) => o.intent.kind === "open" && (o.intent as Extract<Intent, { kind: "open" }>).setup === "strict")
+    .map(([label, o]) => {
+      const intent = o.intent as Extract<Intent, { kind: "open" }>;
+      const s = ctx.view.stats.get(intent.instId);
+      return { label, instId: intent.instId, side: intent.side, score: Math.abs(s?.trend?.score ?? 0) };
+    })
+    .sort((a, b) => b.score - a.score || (a.label < b.label ? -1 : a.label > b.label ? 1 : 0));
+  const best = cands[0];
+  if (!best) return { choice: null, reason: "ghost_no_strict_setup", detail: null };
+  return { choice: best.label, reason: "ghost_top_score", detail: { instId: best.instId, side: best.side, score: best.score } };
+}
+
+/**
+ * Scout snapshot writer (LOG-ONLY): stores the shortlist only when the eligible
+ * set changed since the last stored snapshot, so the log shows transitions
+ * instead of one row per refresh. Never gates trading — the caller keeps
+ * trading the brains' own universes. Returns true when a row was stored.
+ */
+export function storeScoutIfChanged(
+  db: Db,
+  ts: number,
+  eligible: string[],
+  excluded: Array<{ instId: string; reasons: string[] }>,
+): boolean {
+  const prev = db.latestScoutSnapshot();
+  if (prev && eligibleSetEqual(prev.eligible, eligible)) return false;
+  db.insertScoutSnapshot({ ts, eligible, excluded });
+  return true;
+}
+
+/** Per-instrument sum of open notional across bees (mark-based). Alert-only; the engine never trades on it. */
+export function aggregateExposure(bees: BeeState[], view: MarketView): Array<{ instId: string; coin: string; notionalUsd: number; bees: number }> {
+  const sums = new Map<string, { coin: string; notionalUsd: number; bees: number }>();
+  for (const b of bees) {
+    const p = b.position;
+    if (!p) continue;
+    const inst = view.instruments.get(p.instId);
+    const t = view.tickers.get(p.instId);
+    if (!inst || !t) continue;
+    const e = sums.get(p.instId) ?? { coin: p.coin, notionalUsd: 0, bees: 0 };
+    e.notionalUsd += positionNotional(p, t.mid, inst.ctVal);
+    e.bees += 1;
+    sums.set(p.instId, e);
+  }
+  return [...sums.entries()].map(([instId, v]) => ({ instId, ...v }));
+}
+
+/** Breakeven stop: entry ± feeBufferR (in R) in the position's favour. Null when 1R has no price meaning. */
+export function breakevenStopPx(p: Position, ctVal: number, feeBufferR: number): number | null {
+  if (!Number.isFinite(p.entryPx) || p.riskUsd <= 0 || p.contracts <= 0 || !(ctVal > 0) || !Number.isFinite(feeBufferR)) return null;
+  const rPx = p.riskUsd / (p.contracts * ctVal);
+  if (!(rPx > 0) || !Number.isFinite(rPx)) return null;
+  return p.side === "long" ? p.entryPx + feeBufferR * rPx : p.entryPx - feeBufferR * rPx;
+}
 
 export interface EngineDeps {
   cfg: Config;
@@ -59,6 +252,21 @@ export class Engine {
   private lastFundingSlot: number;
   private seq = 0;
   private jevDownAlerted = false;
+  /** Monotonic decide-tick counter: the heartbeat measures ticks-since-last-ask in these. */
+  private tickIndex = 0;
+  /** Per-bee last real Jev answer (REUSE-LAST-ANSWER cache). */
+  private jevCache = {} as Partial<Record<BeeId, JevCacheEntry>>;
+  /** Per-bee Jev call counters + cost basis for estUsdSaved (avg cost of real ok calls). */
+  private jevMade = {} as Partial<Record<BeeId, number>>;
+  private jevSkipped = {} as Partial<Record<BeeId, number>>;
+  private jevCostSum = {} as Partial<Record<BeeId, number>>;
+  private jevOkCount = {} as Partial<Record<BeeId, number>>;
+  /** Aggregate-exposure re-alert gate per instId (alert-only monitor). */
+  private aggAlertedAt = new Map<string, number>();
+  /** Liq-proxy counters per bee (no veto — real guard awaits the OKX margin feed). */
+  private liqSamples = {} as Partial<Record<BeeId, number>>;
+  private liqMax = {} as Partial<Record<BeeId, number>>;
+  private liqLast = {} as Partial<Record<BeeId, number | null>>;
   private recon: { ok: boolean | null; detail: string; ts: number } = { ok: null, detail: "not run yet", ts: 0 };
   private liveStartedAt: number | null = null;
   private lastPulseAt: Partial<Record<BeeId, number>> = {};
@@ -113,7 +321,7 @@ export class Engine {
     this.loop(() => this.tick(), cfg.tickMs);
     this.loop(() => this.refreshMarket(), cfg.dataRefreshMs);
     this.timers.push(setInterval(() => this.d.bus.emit("heartbeat", {}), 15_000));
-    this.timers.push(setInterval(() => this.d.db.pruneEvents(this.now() - 3 * 86_400_000), 3_600_000));
+    this.timers.push(setInterval(() => { this.d.db.pruneEvents(this.now() - 3 * 86_400_000); this.d.db.pruneGhostDecisions(this.now() - 3 * 86_400_000); this.d.db.pruneScoutSnapshots(this.now() - 3 * 86_400_000); }, 3_600_000));
   }
 
   stop(): void {
@@ -142,6 +350,7 @@ export class Engine {
     try {
       await this.d.feed.refresh(this.now());
       this.rankBoozyHourly();
+      this.recordScout(this.now());
       if (this.d.exec.kind === "okx") await this.pollFunding();
     } catch (err) {
       log.warn("market refresh failed", { err: safeError(err) });
@@ -150,11 +359,35 @@ export class Engine {
     }
   }
 
+  /**
+   * Scout visibility (LOG-ONLY, never gates trading): after each market refresh,
+   * screen the universe and store a snapshot only when the eligible set changed
+   * (opportunities decay — the log shows transitions, not every refresh).
+   * Excluded reasons are sampled to the top ~10 by volume to bound row size.
+   * Failures are contained so the screen can never break a market refresh.
+   */
+  private recordScout(now: number): void {
+    try {
+      const view = this.d.feed.view();
+      const r = screenUniverse(view, {
+        spreadGateBps: Math.max(...STYLES.map((s) => this.d.cfg.bees[s].spreadGateBps)),
+        min24hVolUsd: this.d.cfg.universe.min24hVolUsd,
+      });
+      const excluded = sampleExcluded(r.excluded, (id) => view.stats.get(id)?.vol24hUsd ?? 0);
+      if (storeScoutIfChanged(this.d.db, now, r.eligible, excluded)) {
+        log.info("scout transition", { eligible: r.eligible, excluded: excluded.length });
+      }
+    } catch (err) {
+      log.warn("scout snapshot failed", { err: safeError(err) });
+    }
+  }
+
   // ---------- the tick ----------
 
   async tick(): Promise<void> {
     if (this.ticking) return;
     this.ticking = true;
+    this.tickIndex++;
     try {
       try {
         await this.d.feed.refreshTickers();
@@ -163,6 +396,7 @@ export class Engine {
       }
       const now = this.now();
       for (const id of BEES) this.markBee(id, now);
+      for (const id of BEES) this.sampleLiqProxy(id);
       if (this.d.feed.lastRefreshAt === 0) return; // no market data yet
       if (this.d.exec.kind === "sim") this.simulateFunding(now);
 
@@ -170,6 +404,7 @@ export class Engine {
       if (this.closedAt === null && this.d.takeResumeRequest?.()) await this.resumeLast(now);
       if (this.closedAt !== null) await this.windDown(now);
       else await Promise.all(BEES.map((id) => this.decide(id, now).catch((err) => log.error("decision failed", { bee: id, err: safeError(err) }))));
+      this.checkAggregateExposure(now);
 
       if (now - this.lastEquityAt >= EQUITY_SNAPSHOT_MS) {
         this.lastEquityAt = now;
@@ -219,8 +454,114 @@ export class Engine {
     }
   }
 
-  private async decide(id: BeeId, now: number): Promise<void> {
-    const { cfg, db, bus, jev } = this.d;
+  /** Store a real answer for REUSE-LAST-ANSWER and fold its cost into the per-bee avg cost basis. */
+  private rememberJevAnswer(id: BeeId, r: Extract<JevResult, { ok: true }>, menu: Menu, ctx: BeeContext, brain: BeeBrain, stale: boolean): void {
+    this.jevCache[id] = {
+      choice: r.choice,
+      conviction: r.conviction,
+      convictionRaw: r.convictionRaw,
+      prob: r.probabilities[r.choice] ?? 0,
+      confidence: r.confidence,
+      probabilities: { ...r.probabilities },
+      menuHash: menuHashFor(menu),
+      stateHash: stateHashFor(ctx),
+      topId: topIdFor(brain, ctx),
+      posKey: posKeyFor(ctx),
+      cap: ctx.bee.cap,
+      stale,
+      askedAtTick: this.tickIndex,
+    };
+    this.jevCostSum[id] = (this.jevCostSum[id] ?? 0) + r.costUsd;
+    this.jevOkCount[id] = (this.jevOkCount[id] ?? 0) + 1;
+  }
+
+  /** Avg cost of this bee's real Jev calls (0 until the first ok call). Basis for estUsdSaved. */
+  private jevAvgCost(id: BeeId): number {
+    const n = this.jevOkCount[id] ?? 0;
+    return n > 0 ? (this.jevCostSum[id] ?? 0) / n : 0;
+  }
+
+  private jevSavedUsd(id: BeeId): number {
+    return (this.jevSkipped[id] ?? 0) * this.jevAvgCost(id);
+  }
+
+  /**
+   * Ratchet-only breakeven move (same discipline as the trail in markBee: the stop only
+   * ever moves in the position's favour, never loosens). Sets beMoved; the caller persists
+   * via the existing saveBee path. Returns a status note, or null when nothing applied.
+   */
+  private moveStopToBreakeven(id: BeeId, ctx: BeeContext, uplR: number): string | null {
+    const p = ctx.bee.position;
+    const pol = this.brain(id).takeProfit;
+    if (!p || !pol) return null;
+    const inst = ctx.view.instruments.get(p.instId);
+    const be = inst ? breakevenStopPx(p, inst.ctVal, pol.feeBufferR) : null;
+    if (be === null) return null;
+    if (p.side === "long") p.stopPx = p.stopPx === null ? be : Math.max(p.stopPx, be);
+    else p.stopPx = p.stopPx === null ? be : Math.min(p.stopPx, be);
+    p.beMoved = true;
+    return `stop→BE at +${uplR.toFixed(1)}R`;
+  }
+
+  /**
+   * Ghost benchmark (caged): ONE row per bee every GHOST_EVERY_TICKS ticks, written ONLY
+   * to ghost_decisions via insertGhostDecision. Never touches orders/fills/decisions,
+   * never emits bus events. Failures are contained (warn) so the benchmark can never
+   * break a trading tick.
+   */
+  private recordGhost(id: BeeId, ctx: BeeContext, brain: BeeBrain, menu: Menu, now: number): void {
+    if (this.tickIndex % GHOST_EVERY_TICKS !== 0) return;
+    try {
+      const pick = ghostPick(brain, ctx, menu);
+      this.d.db.insertGhostDecision({ bee: id, ts: now, choice: pick.choice, reason: pick.reason, detail: pick.detail });
+    } catch (err) {
+      log.warn("ghost benchmark write failed", { bee: id, err: safeError(err) });
+    }
+  }
+
+  /**
+   * Liq proxy (NO veto, counters only): per-position notional/equity, sampled. A real
+   * guard awaits the OKX margin feed — this only makes leverage drift visible in logs.
+   */
+  private sampleLiqProxy(id: BeeId): void {
+    const bee = this.bees[id];
+    const p = bee.position;
+    if (!p) {
+      this.liqLast[id] = null;
+      return;
+    }
+    const view = this.d.feed.view();
+    const inst = view.instruments.get(p.instId);
+    const mid = view.tickers.get(p.instId)?.mid ?? view.stats.get(p.instId)?.mid;
+    if (!inst || mid === undefined || !(bee.equityUsd > 0)) return;
+    const ratio = positionNotional(p, mid, inst.ctVal) / bee.equityUsd;
+    this.liqSamples[id] = (this.liqSamples[id] ?? 0) + 1;
+    this.liqMax[id] = Math.max(this.liqMax[id] ?? 0, ratio);
+    this.liqLast[id] = ratio;
+    if (this.tickIndex % LIQ_SAMPLE_TICKS === 0) {
+      log.info("liq proxy", { bee: id, coin: p.coin, side: p.side, notionalEquityRatio: Number(ratio.toFixed(3)) });
+    }
+  }
+
+  /**
+   * Aggregate monitor (ALERT-ONLY, not a veto): per-instrument sum of open notional across
+   * the 3 bees vs the single-instrument cap (cfg.risk.maxNotionalUsdPerBee). Logs + alerts,
+   * zero trading effect.
+   */
+  private checkAggregateExposure(now: number): void {
+    const rows = aggregateExposure(BEES.map((id) => this.bees[id]), this.d.feed.view());
+    for (const r of rows) {
+      if (r.notionalUsd <= this.d.cfg.risk.maxNotionalUsdPerBee) continue;
+      const last = this.aggAlertedAt.get(r.instId) ?? 0;
+      if (now - last < AGG_ALERT_MS) continue;
+      this.aggAlertedAt.set(r.instId, now);
+      this.d.alerts.send(
+        `aggregate exposure ${r.coin} $${r.notionalUsd.toFixed(0)} across ${r.bees} bees > $${this.d.cfg.risk.maxNotionalUsdPerBee.toFixed(0)} single-instrument cap (alert-only, no trading effect)`,
+      );
+    }
+  }
+
+  private async decide(id: BeeId, now: number): Promise<void> {    const { cfg, db, bus, jev } = this.d;
     const brain = this.brain(id);
     const bee = this.bees[id];
     // Benched (trade cap or fee budget): the bee rides whatever it holds. Jev is not asked, because nothing it
@@ -233,22 +574,57 @@ export class Engine {
 
     let jevStatus: JevStatus = "ok";
     let r: JevResult | null = null;
+    let cached: JevCacheEntry | null = null;
+    let jevCached = false;
+    const dataAgeMs = now - this.d.feed.lastRefreshAt;
+    const maxDataAgeMs = 3 * cfg.dataRefreshMs + 30_000;
     if (jev.capTripped) jevStatus = "daily_cap";
     else if (Object.keys(menu).length === 0) jevStatus = "no_options";
-    else {
+    else if (jev.downSince !== null) {
+      // Known outage: bypass the cache so the fail-closed path runs on a live answer.
       r = await jev.decide({ strategy: brain.strategy, state: snap.state, menu, convictionLabels: brain.convictionLabels });
+      this.jevMade[id] = (this.jevMade[id] ?? 0) + 1;
       if (!r.ok) jevStatus = r.reason === "daily_cap" ? "daily_cap" : "unreachable";
+      else this.rememberJevAnswer(id, r, menu, ctx, brain, dataAgeMs > maxDataAgeMs);
+    } else {
+      const cur: CacheNow = {
+        menuHash: menuHashFor(menu),
+        stateHash: stateHashFor(ctx),
+        topId: topIdFor(brain, ctx),
+        posKey: posKeyFor(ctx),
+        cap: bee.cap,
+        stale: dataAgeMs > maxDataAgeMs,
+      };
+      const prev = this.jevCache[id];
+      const ticksSinceAsk = prev ? this.tickIndex - prev.askedAtTick : Number.POSITIVE_INFINITY;
+      if (prev && menu[prev.choice] && cacheReusable(prev, cur, ticksSinceAsk, cfg.jev.heartbeatTicks)) {
+        cached = prev;
+        jevCached = true;
+        this.jevSkipped[id] = (this.jevSkipped[id] ?? 0) + 1;
+        log.debug("jev answer reused", { bee: id, choice: prev.choice, ticksSinceAsk });
+      } else {
+        r = await jev.decide({ strategy: brain.strategy, state: snap.state, menu, convictionLabels: brain.convictionLabels });
+        this.jevMade[id] = (this.jevMade[id] ?? 0) + 1;
+        if (!r.ok) jevStatus = r.reason === "daily_cap" ? "daily_cap" : "unreachable";
+        else this.rememberJevAnswer(id, r, menu, ctx, brain, cur.stale);
+      }
     }
     const proposal: Proposal | null =
-      r && r.ok ? { label: r.choice, intent: menu[r.choice]!.intent, prob: r.probabilities[r.choice] ?? 0, conviction: r.conviction } : null;
+      r && r.ok
+        ? { label: r.choice, intent: menu[r.choice]!.intent, prob: r.probabilities[r.choice] ?? 0, conviction: r.conviction }
+        : cached
+          ? { label: cached.choice, intent: menu[cached.choice]!.intent, prob: cached.prob, conviction: cached.conviction }
+          : null;
 
+    // Risk runs EVERY tick, cached or not: stops, caps, spread/funding vetoes and gates
+    // all fire in code either way. Only the Jev API call is ever skipped.
     const risk = applyRisk({
       ctx,
       brain,
       proposal,
       jev: jevStatus,
       sizeMult: this.sizeMult(now),
-      dataAgeMs: now - this.d.feed.lastRefreshAt,
+      dataAgeMs,
       maxDataAgeMs: 3 * cfg.dataRefreshMs + 30_000,
     });
 
@@ -260,6 +636,39 @@ export class Engine {
     }
     bee.cap = risk.cap;
 
+    // Take-profit / breakeven (per-brain opt-in only, never universal): code-driven, after
+    // risk, and only when risk says hold — never overrides a stop, veto or close. The trim
+    // reuses the EXISTING trim execution path below; trimmedAtR is set only on fill confirm.
+    let action = risk.action;
+    let forcedBy = risk.forcedBy;
+    let status = risk.status;
+    let tpTrim: { fraction: number; uplR: number } | null = null;
+    const tpPol = brain.takeProfit;
+    if (tpPol && bee.position && action.kind === "none" && ctx.uplR !== null) {
+      const sig = takeProfitSignal(bee.position, ctx.uplR, tpPol);
+        if (sig?.trim && bee.position) {
+          // A trim that rounds below minimum size would no-op every tick without ever
+          // setting trimmedAtR (Finding 2): mark it spent here instead of emitting it.
+          const inst = ctx.view.instruments.get(bee.position.instId);
+          const lots = inst ? roundToLot(bee.position.contracts * sig.trim.fraction, inst) : 0;
+          if (inst && lots >= inst.minSz) {
+            tpTrim = { fraction: sig.trim.fraction, uplR: ctx.uplR };
+            action = { kind: "trim", fraction: sig.trim.fraction };
+            forcedBy = "take_profit";
+            status = `take-profit trim ${Math.round(sig.trim.fraction * 100)}% at +${ctx.uplR.toFixed(1)}R`;
+          } else {
+            bee.position.trimmedAtR = ctx.uplR;
+            log.info("take-profit trim below minimum size, marked spent", { bee: id });
+          }
+        }
+        if (sig?.moveStopToBe) {
+          const note = this.moveStopToBreakeven(id, ctx, ctx.uplR);
+          if (note) status = `${status}; ${note}`;
+        }
+    }
+
+    this.recordGhost(id, ctx, brain, menu, now);
+
     // Hard rule 10: recorded before it is acted on.
     const costUsd = r && r.ok ? r.costUsd : 0;
     const decisionId = db.insertDecision({
@@ -268,24 +677,30 @@ export class Engine {
       stateHash: snap.hash,
       stateJson: JSON.stringify(snap.state),
       menuJson: JSON.stringify(Object.keys(menu)),
-      choice: r && r.ok ? r.choice : null,
-      probabilities: r && r.ok ? r.probabilities : null,
-      confidence: r && r.ok ? r.confidence : null,
-      conviction: r && r.ok ? r.convictionRaw : null,
+      choice: r && r.ok ? r.choice : (cached?.choice ?? null),
+      probabilities: r && r.ok ? r.probabilities : cached ? cached.probabilities : null,
+      confidence: r && r.ok ? r.confidence : (cached?.confidence ?? null),
+      conviction: r && r.ok ? r.convictionRaw : (cached?.convictionRaw ?? null),
       latencyMs: r ? r.latencyMs : null,
       inputTokens: r && r.ok ? r.inputTokens : null,
       jevCostUsd: costUsd,
       jevError: r && !r.ok ? `${r.reason}${r.error ? `: ${r.error.code} ${r.error.message}` : ""}` : null,
-      action: risk.action,
+      jevCached,
+      action,
       vetoedBy: risk.vetoedBy,
-      forcedBy: risk.forcedBy,
-      status: risk.status,
+      forcedBy,
+      status,
     });
     bee.totals.jevUsd += costUsd;
     bee.totals.decisions++;
 
-    const top3 = r && r.ok ? (Object.entries(r.probabilities).sort((a, b) => b[1] - a[1]).slice(0, 3) as Array<[string, number]>) : [];
-    this.last[id] = { choice: r && r.ok ? r.choice : null, top3, confidence: r && r.ok ? r.confidence : null, latencyMs: r ? r.latencyMs : null, status: risk.status, ts: now };
+    const top3 =
+      r && r.ok
+        ? (Object.entries(r.probabilities).sort((a, b) => b[1] - a[1]).slice(0, 3) as Array<[string, number]>)
+        : cached
+          ? (Object.entries(cached.probabilities).sort((a, b) => b[1] - a[1]).slice(0, 3) as Array<[string, number]>)
+          : [];
+    this.last[id] = { choice: r && r.ok ? r.choice : (cached?.choice ?? null), top3, confidence: r && r.ok ? r.confidence : (cached?.confidence ?? null), latencyMs: r ? r.latencyMs : null, status, ts: now };
     // Flat and nothing to ask Jev (bizzy waiting for her breakout): a live "watching" row every PULSE_MS instead of a
     // "no call" row every tick, so the stream shows how close the trigger is.
     const watching = jevStatus === "no_options" && !bee.position && !!brain.idleStatus && risk.action.kind === "none";
@@ -298,25 +713,35 @@ export class Engine {
       "decision",
       {
         bee: id,
-        choice: r && r.ok ? r.choice : watching ? "WATCHING" : null,
-        ...(watching ? { watch: risk.status } : {}),
+        choice: r && r.ok ? r.choice : watching ? "WATCHING" : (cached?.choice ?? null),
+        ...(watching ? { watch: status } : {}),
         probabilities: top3.map(([label, p]) => ({ label, p: Number(p.toFixed(3)) })),
-        confidence: r && r.ok ? Number(r.confidence.toFixed(3)) : null,
-        conviction: r && r.ok ? brain.convictionLabels[r.conviction] : null,
+        confidence: r && r.ok ? Number(r.confidence.toFixed(3)) : (cached ? Number(cached.confidence.toFixed(3)) : null),
+        conviction: r && r.ok ? brain.convictionLabels[r.conviction] : cached ? brain.convictionLabels[cached.conviction] : null,
         latencyMs: r ? r.latencyMs : null,
         tokens: r && r.ok ? r.inputTokens : null,
         jevUsd: Number(costUsd.toFixed(6)),
-        action: describeAction(risk.action),
+        action: describeAction(action),
         vetoedBy: risk.vetoedBy,
-        forcedBy: risk.forcedBy,
-        status: risk.status,
+        forcedBy,
+        status,
         jev: jevStatus,
+        cached: jevCached,
         ...this.liveChip(id),
       },
       now,
     );
 
-    if (risk.action.kind !== "none") await this.execute(id, risk.action, decisionId, ctx, proposal?.conviction ?? 0);
+    const contractsBefore = bee.position?.contracts ?? null;
+    if (action.kind !== "none") {
+      // Any executed action changes the world the cached answer was given for:
+      // drop the cache so the next tick asks Jev afresh. Never re-trade stale intent.
+      delete this.jevCache[id];
+      await this.execute(id, action, decisionId, ctx, proposal?.conviction ?? 0);
+    }
+    if (tpTrim && bee.position && contractsBefore !== null && bee.position.contracts < contractsBefore) {
+      bee.position.trimmedAtR = tpTrim.uplR;
+    }
     db.saveBee(bee, now);
   }
 
@@ -341,8 +766,18 @@ export class Engine {
       this.d.alerts.send(`${this.d.cfg.slots[id].name}: ${risk.status}`);
     }
     bee.cap = risk.cap;
+    // Benched: no new orders (not even TP trims — the fee budget may be why this bee is
+    // benched), but the free, risk-reducing breakeven move still applies when risk holds.
+    let benchStatus = risk.status;
+    if (risk.action.kind === "none" && bee.position && ctx.uplR !== null && this.brain(id).takeProfit) {
+      const sig = takeProfitSignal(bee.position, ctx.uplR, this.brain(id).takeProfit!);
+      if (sig?.moveStopToBe) {
+        const note = this.moveStopToBreakeven(id, ctx, ctx.uplR);
+        if (note) benchStatus = `${benchStatus}; ${note}`;
+      }
+    }
     const prev = this.last[id];
-    this.last[id] = { choice: null, top3: prev?.top3 ?? [], confidence: null, latencyMs: null, status: risk.status, ts: now };
+    this.last[id] = { choice: null, top3: prev?.top3 ?? [], confidence: null, latencyMs: null, status: benchStatus, ts: now };
     if (risk.action.kind !== "none") {
       const decisionId = db.insertDecision({
         bee: id, ts: now, stateHash: "", stateJson: "{}", menuJson: "[]", choice: null, probabilities: null, confidence: null,
@@ -361,7 +796,7 @@ export class Engine {
       const p = bee.position;
       this.d.bus.emit("decision", {
         bee: id, choice: p ? `RIDING ${p.coin}` : "BENCHED", probabilities: [], confidence: null, conviction: null, latencyMs: null,
-        tokens: null, jevUsd: 0, action: "hold", vetoedBy: null, forcedBy: null, status: risk.status, jev: "benched", pulse: true,
+        tokens: null, jevUsd: 0, action: "hold", vetoedBy: null, forcedBy: null, status: benchStatus, jev: "benched", pulse: true,
         ...this.liveChip(id),
       }, now);
     }
@@ -638,6 +1073,9 @@ export class Engine {
           const inst = view.instruments.get(theirs.instId);
           const side: Side = theirs.pos > 0 ? "long" : "short";
           const keepStop = ours && sameInst && ours.side === side ? ours.stopPx : null;
+          // One-shot take-profit flags survive reconcile when we still hold the same side of
+          // the same instrument (they are persisted via saveBee, never reset by a re-read).
+          const keepFlags = ours && sameInst && ours.side === side;
           bee.position = {
             instId: theirs.instId,
             coin: theirs.instId.split("-")[0]!,
@@ -647,6 +1085,8 @@ export class Engine {
             openedAt: ours?.openedAt ?? now,
             stopPx: keepStop ?? this.brain(id).stopFor(theirs.instId, side, theirs.avgPx, this.ctx(id, now)),
             riskUsd: ours?.riskUsd ?? (inst ? Math.abs(theirs.pos) * inst.ctVal * theirs.avgPx * 0.01 : 0),
+            trimmedAtR: keepFlags ? (ours!.trimmedAtR ?? null) : null,
+            beMoved: keepFlags ? (ours!.beMoved ?? false) : false,
           };
           bee.flatSince = null;
         }
@@ -688,6 +1128,14 @@ export class Engine {
     return this.d.cfg.bees[this.d.cfg.slots[id].style];
   }
 
+  /**
+   * Outage detection runs on real calls only (jev.downSince is set by Jev.decide failures).
+   * The cache heartbeat guarantees a real call at least every HEARTBEAT_TICKS decide ticks
+   * per bee, so a "no real call for > X" stall cannot hide an outage: a down Jev is noticed
+   * at the latest on the next heartbeat call, and "Jev is back" fires on the first success
+   * after that. While downSince !== null the cache is bypassed, so detection and recovery
+   * both observe live answers.
+   */
   private checkJevOutage(now: number) {
     const since = this.d.jev.downSince;
     if (since === null) {
@@ -739,7 +1187,10 @@ export class Engine {
       feesTodayUsd: r2(b.feesTodayUsd),
       feeBudgetUsd: knobs.feeBudgetUsdDay,
       cap: b.cap,
-      totals: { feesUsd: r2(b.totals.feesUsd), fundingUsd: r2(b.totals.fundingUsd), jevUsd: Number(b.totals.jevUsd.toFixed(4)), realisedUsd: r2(b.totals.realisedUsd), decisions: b.totals.decisions, orders: b.totals.orders },
+      totals: { feesUsd: r2(b.totals.feesUsd), fundingUsd: r2(b.totals.fundingUsd), jevUsd: Number(b.totals.jevUsd.toFixed(4)), realisedUsd: r2(b.totals.realisedUsd), decisions: b.totals.decisions, orders: b.totals.orders,
+        jevCallsMade: this.jevMade[id] ?? 0, jevCallsSkipped: this.jevSkipped[id] ?? 0, jevSavedUsd: Number(this.jevSavedUsd(id).toFixed(4)) },
+      // Liq proxy (no veto): last + max notional/equity. Real guard awaits the OKX margin feed.
+      liqProxy: { ratio: this.liqLast[id] ?? null, max: this.liqMax[id] ?? null, samples: this.liqSamples[id] ?? 0 },
       maxNotionalUsd: r2(maxNotionalUsd(this.ctx(id, this.now()))),
       last: this.last[id] ?? null,
     };
@@ -749,6 +1200,7 @@ export class Engine {
     const bees = BEES.map((id) => this.publicBee(id));
     const sum = (f: (b: (typeof bees)[number]) => number) => Number(bees.reduce((a, b) => a + f(b), 0).toFixed(4));
     const view = this.d.feed.view();
+    const scoutLatest = this.d.db.latestScoutSnapshot();
     return {
       ts: this.now(),
       mode: this.d.cfg.mode,
@@ -759,7 +1211,11 @@ export class Engine {
       bees,
       leaderboard: [...bees].sort((a, b) => b.equityUsd - a.equityUsd).map((b) => ({ bee: b.bee, equityUsd: b.equityUsd })),
       totals: { feesUsd: sum((b) => b.totals.feesUsd), fundingUsd: sum((b) => b.totals.fundingUsd), jevUsd: sum((b) => b.totals.jevUsd), pnlUsd: sum((b) => b.pnlUsd) },
-      jev: { spentTodayUsd: Number(this.d.jev.spentTodayUsd.toFixed(4)), dailyCapUsd: this.d.cfg.jev.dailyUsdCap, capTripped: this.d.jev.capTripped, down: this.d.jev.downSince !== null },
+      jev: { spentTodayUsd: Number(this.d.jev.spentTodayUsd.toFixed(4)), dailyCapUsd: this.d.cfg.jev.dailyUsdCap, capTripped: this.d.jev.capTripped, down: this.d.jev.downSince !== null,
+        heartbeatTicks: this.d.cfg.jev.heartbeatTicks,
+        callsMade: BEES.reduce((a, id) => a + (this.jevMade[id] ?? 0), 0),
+        callsSkipped: BEES.reduce((a, id) => a + (this.jevSkipped[id] ?? 0), 0),
+        estSavedUsd: Number(BEES.reduce((a, id) => a + this.jevSavedUsd(id), 0).toFixed(4)) },
       recon: this.recon,
       market: {
         refreshedAt: view.ts,
@@ -767,6 +1223,8 @@ export class Engine {
         spreadBlocked: view.spreadBlocked.map((i) => ({ coin: i.split("-")[0], spreadBp: Number((view.tickers.get(i)?.spreadBp ?? 0).toFixed(1)) })),
         attention: view.newsAvailable ? "news" : "volume",
       },
+      // Latest scout shortlist transition (log-only visibility; nothing trades on it).
+      scout: scoutLatest ? { ts: scoutLatest.ts, eligible: scoutLatest.eligible, excluded: scoutLatest.excluded } : null,
     };
   }
 

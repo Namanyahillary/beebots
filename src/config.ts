@@ -70,6 +70,8 @@ const EnvSchema = z.object({
   JEV_TIMEOUT_MS: num(2000),
   JEV_DAILY_USD_CAP: num(2),
   JEV_USD_PER_MTOK: num(0.042),
+  /** Cached-answer heartbeat: a real Jev call at least every N decide ticks per bee (default 12 ≈ 2 min at 10 s). */
+  JEV_HEARTBEAT_TICKS: num(12),
   TICK_MS: num(10_000),
   DATA_REFRESH_MS: num(60_000),
 
@@ -166,7 +168,7 @@ export interface Config {
   hive: { url: string };
   update: { enabled: boolean; repo: string; version: string };
   settingsPath: string;
-  jev: { apiKey: string; model: string; timeoutMs: number; dailyUsdCap: number; usdPerMTok: number };
+  jev: { apiKey: string; model: string; timeoutMs: number; dailyUsdCap: number; usdPerMTok: number; heartbeatTicks: number };
   tickMs: number;
   dataRefreshMs: number;
   okx: { site: "eea"; apiBase: string; cliTimeoutMs: number };
@@ -271,6 +273,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, settings: Setti
       timeoutMs: e.JEV_TIMEOUT_MS,
       dailyUsdCap: e.JEV_DAILY_USD_CAP,
       usdPerMTok: e.JEV_USD_PER_MTOK,
+      heartbeatTicks: Math.max(1, Math.round(e.JEV_HEARTBEAT_TICKS)),
     },
     tickMs: Math.max(1000, e.TICK_MS),
     dataRefreshMs: Math.max(15_000, e.DATA_REFRESH_MS),

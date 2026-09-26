@@ -3,14 +3,21 @@ import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import type { BeeId } from "./config.js";
-import type { BeeState } from "./bees/types.js";
+import type { BeeState, Position } from "./bees/types.js";
+
+/** Backfill the one-shot take-profit flags on a stored position. Preserves set values across restores. */
+export function normalizePosition(p: Position): Position {
+  p.trimmedAtR ??= null;
+  p.beMoved ??= false;
+  return p;
+}
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS decisions (
   id INTEGER PRIMARY KEY, bee TEXT NOT NULL, ts INTEGER NOT NULL,
   state_hash TEXT, state_json TEXT, menu_json TEXT,
   choice TEXT, probabilities_json TEXT, confidence REAL, conviction REAL,
-  latency_ms INTEGER, input_tokens INTEGER, jev_cost_usd REAL NOT NULL DEFAULT 0, jev_error TEXT,
+  latency_ms INTEGER, input_tokens INTEGER, jev_cost_usd REAL NOT NULL DEFAULT 0, jev_error TEXT, jev_cached INTEGER NOT NULL DEFAULT 0,
   action_json TEXT NOT NULL, vetoed_by TEXT, forced_by TEXT, status TEXT
 );
 CREATE INDEX IF NOT EXISTS decisions_bee_ts ON decisions(bee, ts);
@@ -37,6 +44,17 @@ CREATE TABLE IF NOT EXISTS caps (id INTEGER PRIMARY KEY, ts INTEGER NOT NULL, be
 CREATE TABLE IF NOT EXISTS bee_state (bee TEXT PRIMARY KEY, json TEXT NOT NULL, updated_ts INTEGER NOT NULL);
 CREATE TABLE IF NOT EXISTS events (id INTEGER PRIMARY KEY, ts INTEGER NOT NULL, type TEXT NOT NULL, json TEXT NOT NULL);
 CREATE INDEX IF NOT EXISTS events_ts ON events(ts);
+CREATE TABLE IF NOT EXISTS ghost_decisions (
+  id INTEGER PRIMARY KEY, ts INTEGER NOT NULL, bee TEXT NOT NULL,
+  choice TEXT, reason TEXT, detail TEXT
+);
+CREATE INDEX IF NOT EXISTS ghost_decisions_bee_ts ON ghost_decisions(bee, ts);
+CREATE INDEX IF NOT EXISTS ghost_decisions_ts ON ghost_decisions(ts);
+CREATE TABLE IF NOT EXISTS scout_snapshots (
+  id INTEGER PRIMARY KEY, ts INTEGER NOT NULL,
+  eligible TEXT NOT NULL, excluded TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS scout_snapshots_ts ON scout_snapshots(ts);
 CREATE TABLE IF NOT EXISTS meta (k TEXT PRIMARY KEY, v TEXT NOT NULL);
 `;
 
@@ -54,6 +72,8 @@ export interface DecisionRow {
   inputTokens: number | null;
   jevCostUsd: number;
   jevError: string | null;
+  /** True when the Jev answer was reused from the per-bee cache (no API call this tick). */
+  jevCached?: boolean | null;
   action: unknown;
   vetoedBy: string | null;
   forcedBy: string | null;
@@ -85,6 +105,22 @@ export interface FillRow {
   realisedUsd: number;
 }
 
+/** A ghost (paper-only, never executed) decision. Fully separate from orders/fills/decisions: no helpers here ever write to those tables. */
+export interface GhostDecisionRow {
+  bee: BeeId;
+  ts: number;
+  choice: string | null;
+  reason: string | null;
+  detail: unknown;
+}
+
+/** A scout shortlist transition: what passed the screen plus a sampled why-not for the rest. Log-only, never gates trading. */
+export interface ScoutSnapshotRow {
+  ts: number;
+  eligible: string[];
+  excluded: Array<{ instId: string; reasons: string[] }>;
+}
+
 /** A fill as the Hive sees it (hive.ts): base-asset quantity, no order ids, no account data. */
 export interface HiveFill {
   slot: string;
@@ -105,18 +141,23 @@ export class Db {
     this.raw = new DatabaseSync(path);
     this.raw.exec("PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL; PRAGMA busy_timeout = 5000;");
     this.raw.exec(SCHEMA);
+    // Existing DBs predate jev_cached: backfill the column once. Fresh DBs already have it via SCHEMA.
+    const cols = this.raw.prepare(`PRAGMA table_info(decisions)`).all() as Array<{ name: string }>;
+    if (!cols.some((c) => c.name === "jev_cached")) {
+      this.raw.exec(`ALTER TABLE decisions ADD COLUMN jev_cached INTEGER NOT NULL DEFAULT 0`);
+    }
   }
 
   insertDecision(d: DecisionRow): number {
     const r = this.raw
       .prepare(
         `INSERT INTO decisions (bee, ts, state_hash, state_json, menu_json, choice, probabilities_json, confidence, conviction,
-          latency_ms, input_tokens, jev_cost_usd, jev_error, action_json, vetoed_by, forced_by, status)
-         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+          latency_ms, input_tokens, jev_cost_usd, jev_error, jev_cached, action_json, vetoed_by, forced_by, status)
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
       )
       .run(
         d.bee, d.ts, d.stateHash, d.stateJson, d.menuJson, d.choice, d.probabilities ? JSON.stringify(d.probabilities) : null,
-        d.confidence, d.conviction, d.latencyMs, d.inputTokens, d.jevCostUsd, d.jevError, JSON.stringify(d.action),
+        d.confidence, d.conviction, d.latencyMs, d.inputTokens, d.jevCostUsd, d.jevError, d.jevCached ? 1 : 0, JSON.stringify(d.action),
         d.vetoedBy, d.forcedBy, d.status,
       );
     return Number(r.lastInsertRowid);
@@ -203,7 +244,12 @@ export class Db {
 
   loadBee(bee: BeeId): BeeState | null {
     const row = this.raw.prepare(`SELECT json FROM bee_state WHERE bee = ?`).get(bee) as { json: string } | undefined;
-    return row ? (JSON.parse(row.json) as BeeState) : null;
+    if (!row) return null;
+    const s = JSON.parse(row.json) as BeeState;
+    // Migrate old rows: default the one-shot take-profit flags, preserve them when already set
+    // (reconcile restores must carry these over rather than resetting them).
+    if (s.position) s.position = normalizePosition(s.position);
+    return s;
   }
 
   insertEvent(ts: number, type: string, json: string): void {
@@ -217,6 +263,44 @@ export class Db {
 
   pruneEvents(olderThanTs: number): void {
     this.raw.prepare(`DELETE FROM events WHERE ts < ?`).run(olderThanTs);
+  }
+
+  /** Ghost path only: records a paper decision that was never executed. Never touches orders/fills. */
+  insertGhostDecision(g: GhostDecisionRow): number {
+    const r = this.raw
+      .prepare(`INSERT INTO ghost_decisions (ts, bee, choice, reason, detail) VALUES (?,?,?,?,?)`)
+      .run(g.ts, g.bee, g.choice, g.reason, g.detail === undefined ? null : JSON.stringify(g.detail));
+    return Number(r.lastInsertRowid);
+  }
+
+  pruneGhostDecisions(olderThanTs: number): void {
+    this.raw.prepare(`DELETE FROM ghost_decisions WHERE ts < ?`).run(olderThanTs);
+  }
+
+  /** Scout path only: records a shortlist transition. Never touches orders/fills/decisions. */
+  insertScoutSnapshot(s: ScoutSnapshotRow): number {
+    const r = this.raw
+      .prepare(`INSERT INTO scout_snapshots (ts, eligible, excluded) VALUES (?,?,?)`)
+      .run(s.ts, JSON.stringify(s.eligible), JSON.stringify(s.excluded));
+    return Number(r.lastInsertRowid);
+  }
+
+  /** The most recent scout snapshot, or null when the scout has never stored one. */
+  latestScoutSnapshot(): (ScoutSnapshotRow & { id: number }) | null {
+    const row = this.raw.prepare(`SELECT id, ts, eligible, excluded FROM scout_snapshots ORDER BY id DESC LIMIT 1`).get() as
+      | { id: number; ts: number; eligible: string; excluded: string }
+      | undefined;
+    if (!row) return null;
+    return {
+      id: row.id,
+      ts: row.ts,
+      eligible: JSON.parse(row.eligible) as string[],
+      excluded: JSON.parse(row.excluded) as Array<{ instId: string; reasons: string[] }>,
+    };
+  }
+
+  pruneScoutSnapshots(olderThanTs: number): void {
+    this.raw.prepare(`DELETE FROM scout_snapshots WHERE ts < ?`).run(olderThanTs);
   }
 
   jevSpendSince(ts: number): number {

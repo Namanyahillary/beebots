@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { uplUsd } from "../src/bees/common.js";
 import { contractsFor, formatSz, roundToLot } from "../src/exec/sizing.js";
 import { applyFill, applyFunding, freshBee, mark, rollDay } from "../src/ledger.js";
 import { NOW } from "./fixtures.js";
@@ -54,6 +55,26 @@ describe("ledger", () => {
     applyFill(b, f("sell", 50, 120));
     expect(b.position!.contracts).toBe(150);
     expect(b.position!.entryPx).toBeCloseTo(105);
+  });
+
+  it("scales riskUsd up on add so uplR stays correct across open→add→trim", () => {
+    // ctVal 1: $1 move on N contracts = $N upl. Risk $1/contract = 1R per $1.
+    const g = (side: "buy" | "sell", contracts: number, px: number) => ({ instId: "SOL-USD_UM_XPERP-310404", coin: "SOL", side, contracts, px, feeUsd: 0, ctVal: 1, ts: NOW });
+    const b = freshBee("bee1", 333, NOW);
+    applyFill(b, g("buy", 100, 100));
+    // Engine sets 1R after open (stop $1 away on 100 contracts).
+    b.position!.riskUsd = 100;
+    applyFill(b, g("buy", 100, 110));
+    expect(b.position!.entryPx).toBeCloseTo(105, 10);
+    expect(b.position!.contracts).toBe(200);
+    expect(b.position!.riskUsd).toBeCloseTo(200, 10); // proportional scale-up, not stuck at 100
+    applyFill(b, g("sell", 50, 120));
+    expect(b.position!.contracts).toBe(150);
+    expect(b.position!.riskUsd).toBeCloseTo(150, 10); // symmetric scale-down on trim
+    // $1 above the averaged entry = $150 upl = exactly 1R.
+    const upl = uplUsd(b.position!, 106, 1);
+    expect(upl).toBeCloseTo(150, 10);
+    expect(upl / b.position!.riskUsd).toBeCloseTo(1, 10);
   });
 
   it("marks unrealised P&L into equity", () => {

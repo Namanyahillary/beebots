@@ -151,4 +151,12 @@ export const breezy: BeeBrain = {
     if ((p.side === "long" && t.score > 0) || (p.side === "short" && t.score < 0)) return t.trailStop;
     return null;
   },
+
+  // Gain-and-exit, trend style: breezy already rides winners and trims half on
+  // score decay (-3), so the R-based trim is a second lock-in, not the exit.
+  // BE first at +1R (protects the grind), trim half at +2R (lets the trend leg
+  // run); feeBufferR 0.1R keeps the BE stop a hair in profit past fees.
+  // Ordering matters for takeProfitSignal: breakevenAtR < trimAtR means BE
+  // fires without waiting for the trim (trimFirst = false).
+  takeProfit: { trimAtR: 2, trimFrac: 0.5, breakevenAtR: 1, feeBufferR: 0.1 },
 };

@@ -933,6 +933,26 @@ a.counter.host:hover {
   margin-top: 0.4rem;
   font-size: 0.85rem;
 }
+.scout-excluded-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  margin-top: 0.6rem;
+  border-top: 1px solid var(--line);
+  padding-top: 0.6rem;
+}
+.scout-excluded {
+  display: flex;
+  gap: 0.6rem;
+  align-items: baseline;
+  font-size: 0.78rem;
+}
+.scout-coin {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-weight: 700;
+  flex: none;
+  min-width: 3.4rem;
+}
 
 /* ---------- order cards ---------- */
 .toasts {
@@ -1133,6 +1153,9 @@ a.counter.host:hover {
   .rail-card.blocked {
     order: 2;
   }
+  .rail-card.scout {
+    order: 3;
+  }
   .bee {
     overflow: visible;
     min-height: auto;
@@ -1170,7 +1193,8 @@ a.counter.host:hover {
     grid-template-columns: 1fr 1fr;
   }
   .rail-card.board,
-  .rail-card.blocked {
+  .rail-card.blocked,
+  .rail-card.scout {
     grid-column: 1 / -1;
   }
   .ticker {

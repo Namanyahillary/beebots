@@ -137,4 +137,12 @@ export const boozy: BeeBrain = {
     if (!p || !s || atr === null) return null;
     return p.side === "long" ? s.mid - TRAIL_ATR1H * atr : s.mid + TRAIL_ATR1H * atr;
   },
+
+  // BE-move ONLY: boozy pyramids into winners (+0.5x per +1 ATR up to 2x), so
+  // an R-based trim would fight its design by cutting the leg it just sized
+  // up. trimAtR: Infinity disables the trim (takeProfitSignal compares finite
+  // uplR >= Infinity -> false, so trimDue never fires; trimFirst is false so
+  // BE fires on its own at +1R). trimFrac 0 marks the trim as intentionally
+  // off. BE at +1R with a 0.1R fee buffer fits the 24h-commit wide-trail ride.
+  takeProfit: { trimAtR: Infinity, trimFrac: 0, breakevenAtR: 1, feeBufferR: 0.1 },
 };
