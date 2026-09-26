@@ -601,7 +601,7 @@ export class Engine {
         this.jevSkipped[id] = (this.jevSkipped[id] ?? 0) + 1;
       }
     }
-    if (ruleHold === null) {
+    if (ruleHold === null && Object.keys(menu).length > 0) {
       if (jev.downSince !== null) {
       // Known outage: bypass the cache so the fail-closed path runs on a live answer.
       r = await jev.decide({ strategy: brain.strategy, state: snap.state, menu, convictionLabels: brain.convictionLabels });
