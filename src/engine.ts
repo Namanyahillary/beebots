@@ -525,10 +525,10 @@ export class Engine {
 
   /**
    * Profit-lock trail (opt-in via takeProfit.profitLock): once peak unrealised
-   * reaches activateAtUsd, the stop keeps (1 - givebackFrac) of the peak, so a
-   * +$5 run that fades exits near +$4.50 instead of round-tripping to breakeven
-   * or worse. Ratchet-only like every other stop move; computed from live average
-   * entry so pyramid adds self-correct. Returns a status note, or null.
+   * reaches activateAtPct of entry notional, the stop keeps (1 - givebackFrac) of
+   * the peak, so a faded winner exits near its top instead of round-tripping.
+   * Ratchet-only like every other stop move; computed from live average entry so
+   * pyramid adds self-correct. Returns a status note, or null.
    */
   private applyProfitLock(id: BeeId, ctx: BeeContext): string | null {
     const p = ctx.bee.position;
@@ -537,9 +537,10 @@ export class Engine {
     const upl = ctx.bee.uplUsd;
     if (!(upl > 0)) return null;
     if (p.peakUplUsd == null || upl > p.peakUplUsd) p.peakUplUsd = upl;
-    if (p.peakUplUsd < pol.activateAtUsd) return null;
     const inst = ctx.view.instruments.get(p.instId);
     if (!inst || !(p.contracts > 0)) return null;
+    const entryNotional = p.contracts * inst.ctVal * p.entryPx;
+    if (!(entryNotional > 0) || p.peakUplUsd < pol.activateAtPct * entryNotional) return null;
     const locked = p.peakUplUsd * (1 - pol.givebackFrac);
     const perContract = locked / (p.contracts * inst.ctVal);
     const stop = p.side === "long" ? p.entryPx + perContract : p.entryPx - perContract;

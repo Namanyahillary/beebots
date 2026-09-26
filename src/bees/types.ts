@@ -33,12 +33,12 @@ export interface TakeProfitPolicy {
   breakevenAtR: number;
   feeBufferR: number;
   /**
-   * Profit-lock trail (opt-in per brain): once peak unrealised reaches activateAtUsd,
-   * keep (1 - givebackFrac) of the peak via the stop (e.g. peak $5, giveback 0.1 →
-   * exit at +$4.50 on regression). Ratchet-only, computed from live average entry.
-   * Absent = disabled.
+   * Profit-lock trail (opt-in per brain): once peak unrealised reaches activateAtPct
+   * of entry notional (scales with trade size: 2% of $55 ≈ $1.10, 2% of $330 ≈ $6.60),
+   * keep (1 - givebackFrac) of the peak via the stop. Ratchet-only, computed from live
+   * average entry. Absent = disabled.
    */
-  profitLock?: { givebackFrac: number; activateAtUsd: number } | null;
+  profitLock?: { givebackFrac: number; activateAtPct: number } | null;
 }
 
 export type CapReason = "trade_cap" | "fee_budget" | "loss_stop" | "retired";

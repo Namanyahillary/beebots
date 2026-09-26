@@ -186,7 +186,9 @@ export const boozy: BeeBrain = {
   // uplR >= Infinity -> false, so trimDue never fires; trimFirst is false so
   // BE fires on its own at +1R). trimFrac 0 marks the trim as intentionally
   // off. BE at +1R with a 0.1R fee buffer fits the 24h-commit wide-trail ride.
-  // Profit lock runs alongside: once peak passes $2, the stop keeps 90% of it,
-  // so a faded winner exits near its top instead of round-tripping to breakeven.
-  takeProfit: { trimAtR: Infinity, trimFrac: 0, breakevenAtR: 1, feeBufferR: 0.1, profitLock: { givebackFrac: 0.1, activateAtUsd: 2 } },
+  // Profit lock runs alongside: once peak passes 2% of entry notional, the stop
+  // keeps 90% of it, so a faded winner exits near its top instead of round-tripping
+  // to breakeven. Percentage-based (never fixed dollars): a $55 trade activates near
+  // $1.10, a $330 trade near $6.60.
+  takeProfit: { trimAtR: Infinity, trimFrac: 0, breakevenAtR: 1, feeBufferR: 0.1, profitLock: { givebackFrac: 0.1, activateAtPct: 0.02 } },
 };

@@ -157,3 +157,9 @@ that fades exits near +$4.50, never round-trips to breakeven. peakUplUsd persist
 like the other one-shot flags. Pyramid adds uncovered (follow-up).
 Frequency: boozy 3 → 6 trades/day via local .env (fee $3 budget unchanged — covers
 ~10+ risk-sized trades; binding constraint now measured, not assumed).
+
+## Percentage-based profit-lock activation (corrected)
+Fixed-dollar activation ($2) was wrong: it over-triggers on small trades and
+under-triggers on large ones. Activation is now 2% of entry notional ($55 trade
+activates near $1.10, $330 near $6.60). Giveback stays 10% of peak. Breakeven
+(first priority — BE-move at +1R on boozy) is unchanged and fires before any lock.
