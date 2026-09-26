@@ -63,7 +63,7 @@ describe("Jev client", () => {
     const f = fake(() => err);
     const j = new Jev({ ...base, client: f, now: () => now });
     expect(await j.decide(ask)).toMatchObject({ ok: false, reason: "error" });
-    expect(j.downSince).toBe(1_000_000);
+    expect(j.downSince).toBeNull(); // single failure flaps the counter, not the dashboard
     expect(await j.decide(ask)).toMatchObject({ ok: false, reason: "backoff" });
     expect(f.calls.length).toBe(1);
     now += 2_001;
@@ -80,5 +80,30 @@ describe("Jev client", () => {
     const f = fake(answers);
     expect(await new Jev({ ...base, client: f }).decide({ ...ask, menu: {} })).toMatchObject({ ok: false });
     expect(f.calls.length).toBe(0);
+  });
+});
+
+describe("outage latch (consecutive failures, not flaps)", () => {
+  const ask2 = { strategy: "s", state: { x: 1 }, menu, convictionLabels: ["a", "b", "c", "d"] };
+  const err = new Error("boom"); // no status → no backoff: every tick attempts
+  it("needs 3 straight failures before down latches", async () => {
+    const j = new Jev({ ...base, client: fake(err) });
+    await j.decide(ask2);
+    expect(j.downSince).toBeNull();
+    await j.decide(ask2);
+    expect(j.downSince).toBeNull();
+    await j.decide(ask2);
+    expect(j.downSince).not.toBeNull();
+  });
+  it("a success resets the streak", async () => {
+    let n = 0;
+    const f = fake(() => (++n <= 2 ? err : answers));
+    const j = new Jev({ ...base, client: f });
+    await j.decide(ask2);
+    await j.decide(ask2);
+    expect(j.downSince).toBeNull();
+    const r = await j.decide(ask2);
+    expect(r.ok).toBe(true);
+    expect(j.downSince).toBeNull();
   });
 });

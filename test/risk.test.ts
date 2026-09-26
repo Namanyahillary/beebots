@@ -375,7 +375,7 @@ describe("takeProfitSignal (pure, per-brain opt-in)", () => {
 
 describe("takeProfitSignal ladder (recurring banking)", () => {
   const lad = { trimAtR: 2, trimFrac: 0.5, breakevenAtR: 1, feeBufferR: 0.1, ladder: { everyR: 1, frac: 0.25 } };
-  const mk = (over = {}) => ({ instId: "x", coin: "X", side: "long", contracts: 100, entryPx: 100, openedAt: 0, stopPx: null, riskUsd: 10, trimmedAtR: 2, beMoved: true, lastLadderR: null, ...over });
+  const mk = (over = {}) => ({ instId: "x", coin: "X", side: "long" as const, contracts: 100, entryPx: 100, openedAt: 0, stopPx: null, riskUsd: 10, trimmedAtR: 2, beMoved: true, lastLadderR: null, ...over });
   it("no rung before trim+everyR, rung at 3R, no refire without new R", () => {
     expect(takeProfitSignal(mk(), 2.5, lad)?.trim).toBeUndefined();
     expect(takeProfitSignal(mk(), 3, lad)?.trim).toEqual({ fraction: 0.25, ladder: true });

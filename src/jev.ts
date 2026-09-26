@@ -66,6 +66,9 @@ export class Jev {
   spentTodayUsd: number;
   private backoffUntil = 0;
   private backoffStep = 0;
+  /** Consecutive transport failures. `down` latches only at 3+ in a row so tail
+   *  timeouts flap the counter, not the dashboard: a real outage fails every tick. */
+  private failStreak = 0;
   /** First failure of the current outage, for the "Jev down > 5 min" alert. */
   downSince: number | null = null;
 
@@ -127,6 +130,7 @@ export class Jev {
       this.rollDay();
       this.spentTodayUsd += costUsd;
       this.backoffStep = 0;
+      this.failStreak = 0;
       this.downSince = null;
       if (!labels.includes(a.choice)) {
         return { ok: false, reason: "error", error: { code: "OFF_MENU", message: `choice not in menu` }, latencyMs };
@@ -150,7 +154,8 @@ export class Jev {
         this.backoffStep = Math.min(this.backoffStep + 1, 6);
         this.backoffUntil = this.now() + Math.min(60_000, 1000 * 2 ** this.backoffStep);
       }
-      this.downSince ??= t0;
+      this.failStreak += 1;
+      if (this.failStreak >= 3) this.downSince ??= t0;
       return { ok: false, reason: "error", error: safeError(err), latencyMs };
     }
   }
