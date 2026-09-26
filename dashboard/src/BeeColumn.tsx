@@ -245,6 +245,8 @@ export function BeeColumn({ name, bee, curve, baseline, rank, gap, flash, fills,
           <div className="dim">sitting out while benched: nothing Jev picks could be acted on until 00:00 UTC</div>
         ) : bee?.last?.top3.length ? (
           <ProbBars top3={bee.last.top3} choice={bee.last.choice} color={meta.color} big />
+        ) : bee?.last?.choice != null && (bee?.last?.status ?? "").includes("Jev not asked") ? (
+          <div className="dim">{bee.last.choice} — held by rule, Jev not asked</div>
         ) : (
           <div className="dim">waiting…</div>
         )}
