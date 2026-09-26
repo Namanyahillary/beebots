@@ -9,6 +9,7 @@ import type { ScoutEligibleEntry } from "./scout.js";
 /** Backfill the one-shot take-profit flags on a stored position. Preserves set values across restores. */
 export function normalizePosition(p: Position): Position {
   p.trimmedAtR ??= null;
+  p.lastLadderR ??= null;
   p.beMoved ??= false;
   p.peakUplUsd ??= null;
   return p;

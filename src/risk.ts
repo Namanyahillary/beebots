@@ -250,21 +250,29 @@ export function applyRisk(input: RiskInput): RiskResult {
  * Pure take-profit / breakeven signal (per-brain opt-in; never wired here — the engine wires it).
  * Caller owns the one-shot writes: set trimmedAtR when the trim fills, move the stop to
  * entry ± feeBufferR in the position's favour and set beMoved when moveStopToBe fires.
+ * Ladder rungs behave like trims (caller sets lastLadderR on fill); the min-size
+ * spent rule from the engine applies to rungs too.
  */
 export function takeProfitSignal(
   p: Position | null,
   uplR: number,
   pol: TakeProfitPolicy,
-): { trim?: { fraction: number }; moveStopToBe?: boolean } | null {
+): { trim?: { fraction: number; ladder?: boolean }; moveStopToBe?: boolean } | null {
   if (!p) return null;
   if (!Number.isFinite(uplR)) return null;
   const trimDue = uplR >= pol.trimAtR && p.trimmedAtR == null;
+  // Recurring ladder: only where a base trim exists and already fired.
+  const ladder = pol.ladder;
+  const ladderBase = p.lastLadderR ?? (p.trimmedAtR ?? null);
+  const ladderDue =
+    ladder != null && pol.trimFrac > 0 && ladderBase != null && uplR >= ladderBase + ladder.everyR;
   // When the trim level comes first, BE waits until the trim has filled.
   const trimFirst = pol.trimAtR <= pol.breakevenAtR;
   const beDue = uplR >= pol.breakevenAtR && !p.beMoved && (!trimFirst || p.trimmedAtR != null);
-  if (!trimDue && !beDue) return null;
-  const out: { trim?: { fraction: number }; moveStopToBe?: boolean } = {};
+  if (!trimDue && !ladderDue && !beDue) return null;
+  const out: { trim?: { fraction: number; ladder?: boolean }; moveStopToBe?: boolean } = {};
   if (trimDue) out.trim = { fraction: pol.trimFrac };
+  else if (ladderDue && ladder) out.trim = { fraction: ladder.frac, ladder: true };
   if (beDue) out.moveStopToBe = true;
   return out;
 }

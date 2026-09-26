@@ -257,3 +257,14 @@ describe("boozy risk-normalized entries (1.5% risk per stopped-out entry)", () =
     expect(boozy.sizeFrac({ ...open, instId: noAtr.instId }, 3, c)).toBe(0.5);
   });
 });
+
+describe("boozy spike challenger (volume spike + push-up, label-only)", () => {
+  it("strict long only on spike with upward push", async () => {
+    const { spikeSetup } = await import("../src/bees/boozy.js");
+    const hot = coin("DOGE", { volZ: 2.5, ret1hPct: 1.2 }, 1);
+    expect(spikeSetup(hot)).toMatchObject({ coin: "DOGE" });
+    expect(spikeSetup(coin("DOGE", { volZ: 0.5, ret1hPct: 1.2 }, 1))).toBeNull();
+    expect(spikeSetup(coin("DOGE", { volZ: 2.5, ret1hPct: -0.5 }, 1))).toBeNull();
+    expect(spikeSetup(coin("DOGE", { volZ: null, ret1hPct: 1.2 }, 1))).toBeNull();
+  });
+});

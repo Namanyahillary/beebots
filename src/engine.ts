@@ -705,7 +705,7 @@ export class Engine {
     let action = risk.action;
     let forcedBy = risk.forcedBy;
     let status = risk.status;
-    let tpTrim: { fraction: number; uplR: number } | null = null;
+    let tpTrim: { fraction: number; uplR: number; ladder: boolean } | null = null;
     const tpPol = brain.takeProfit;
     // Rule-dictated hold: name it in the status (stops/vetoes above still win).
     if (ruleHold !== null && !risk.vetoedBy && !risk.forcedBy) status = `RIDE: ${ruleHold} · Jev not asked`;
@@ -717,10 +717,13 @@ export class Engine {
         const inst = ctx.view.instruments.get(bee.position.instId);
         const lots = inst ? roundToLot(bee.position.contracts * sig.trim.fraction, inst) : 0;
         if (inst && lots >= inst.minSz) {
-          tpTrim = { fraction: sig.trim.fraction, uplR: ctx.uplR };
+          tpTrim = { fraction: sig.trim.fraction, uplR: ctx.uplR, ladder: sig.trim.ladder === true };
           action = { kind: "trim", fraction: sig.trim.fraction };
           forcedBy = "take_profit";
           status = `take-profit trim ${Math.round(sig.trim.fraction * 100)}% at +${ctx.uplR.toFixed(1)}R`;
+        } else if (sig.trim.ladder === true) {
+          bee.position.lastLadderR = ctx.uplR;
+          log.info("ladder rung below minimum size, marked spent", { bee: id });
         } else {
           bee.position.trimmedAtR = ctx.uplR;
           log.info("take-profit trim below minimum size, marked spent", { bee: id });
@@ -814,7 +817,8 @@ export class Engine {
       await this.execute(id, action, decisionId, ctx, proposal?.conviction ?? 0);
     }
     if (tpTrim && bee.position && contractsBefore !== null && bee.position.contracts < contractsBefore) {
-      bee.position.trimmedAtR = tpTrim.uplR;
+      if (tpTrim.ladder) bee.position.lastLadderR = tpTrim.uplR;
+      else bee.position.trimmedAtR = tpTrim.uplR;
     }
     db.saveBee(bee, now);
   }
@@ -1163,6 +1167,7 @@ export class Engine {
             stopPx: keepStop ?? this.brain(id).stopFor(theirs.instId, side, theirs.avgPx, this.ctx(id, now)),
             riskUsd: ours?.riskUsd ?? (inst ? Math.abs(theirs.pos) * inst.ctVal * theirs.avgPx * 0.01 : 0),
             trimmedAtR: keepFlags ? (ours!.trimmedAtR ?? null) : null,
+            lastLadderR: keepFlags ? (ours!.lastLadderR ?? null) : null,
             beMoved: keepFlags ? (ours!.beMoved ?? false) : false,
             peakUplUsd: keepFlags ? (ours!.peakUplUsd ?? null) : null,
           };

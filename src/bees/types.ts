@@ -20,6 +20,8 @@ export interface Position {
   entryScore?: number;
   /** R-multiple at which a take-profit trim fired (null = not yet triggered; persisted, survives reconcile). */
   trimmedAtR?: number | null;
+  /** R-multiple of the last ladder rung trim (null = none yet; persisted, survives reconcile). */
+  lastLadderR?: number | null;
   /** True once the stop has been moved to breakeven (false = not yet triggered; persisted, survives reconcile). */
   beMoved?: boolean;
   /** Highest unrealised USD seen on this position (null = not yet measured; persisted, survives reconcile). */
@@ -32,6 +34,12 @@ export interface TakeProfitPolicy {
   trimFrac: number;
   breakevenAtR: number;
   feeBufferR: number;
+  /**
+   * Recurring ladder (opt-in, conservative): after the base trim, trim `frac`
+   * every further `everyR` of gain. Active only where a base trim exists
+   * (trimFrac > 0 and trimmed). Absent = single trim only.
+   */
+  ladder?: { everyR: number; frac: number } | null;
   /**
    * Profit-lock trail (opt-in per brain): once peak unrealised reaches activateAtPct
    * of entry notional (scales with trade size: 2% of $55 ≈ $1.10, 2% of $330 ≈ $6.60),

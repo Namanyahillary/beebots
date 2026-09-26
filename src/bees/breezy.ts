@@ -45,6 +45,9 @@ export const breezy: BeeBrain = {
   // flat contradicts its own timeframe (see 02:00 forced open over a weak-conviction
   // veto). Flat with no setup is a valid state, not a problem to fix.
   neverForce: true,
+  // Recurring ladder: after the +2R half-trim, bank a quarter more every further
+  // +1R. Conservative rungs; min-size spent rule applies per rung. Fills decide.
+  takeProfit: { trimAtR: 2, trimFrac: 0.5, breakevenAtR: 1, feeBufferR: 0.1, ladder: { everyR: 1, frac: 0.25 } },
 
   idleStatus(ctx) {
     // Nearest thing to a tradable trend, for the waiting line.
@@ -168,6 +171,6 @@ export const breezy: BeeBrain = {
   // BE first at +1R (protects the grind), trim half at +2R (lets the trend leg
   // run); feeBufferR 0.1R keeps the BE stop a hair in profit past fees.
   // Ordering matters for takeProfitSignal: breakevenAtR < trimAtR means BE
-  // fires without waiting for the trim (trimFirst = false).
-  takeProfit: { trimAtR: 2, trimFrac: 0.5, breakevenAtR: 1, feeBufferR: 0.1 },
+  // fires without waiting for the trim (trimFirst = false). Recurring ladder
+  // (quarters every further +1R) is configured with neverForce above.
 };

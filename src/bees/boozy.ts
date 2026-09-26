@@ -44,6 +44,21 @@ export function rankCandidates(view: MarketView, spreadGateBps: number): Candida
     .sort((a, b) => b.score - a.score);
 }
 
+/** Volume-spike challenger (DOGE/WIF-style scalp idea, Hive-sourced): strict long
+ *  only on a volume spike (volZ threshold) with price pushing up (positive 1h
+ *  return). Runs as an entry LABEL inside boozy's menu — exits follow boozy's
+ *  own rules (24h commit, BE, profit-lock), NOT a fast fade. That mismatch is
+ *  deliberate and disclosed: fills attributed SPIKE_ vs APE_ will show whether
+ *  spike entries want their own exit behavior (which would need a real strategy
+ *  of their own, not a label). Thresholds are starting guesses. */
+export const SPIKE_MIN_VOL_Z = 2.0;
+
+export function spikeSetup(s: CoinStats, minVolZ = SPIKE_MIN_VOL_Z): { instId: string; coin: string } | null {
+  if ((s.volZ ?? Number.NEGATIVE_INFINITY) < minVolZ) return null;
+  if (!((s.ret1hPct ?? 0) > 0)) return null;
+  return { instId: s.instId, coin: s.coin };
+}
+
 export const boozy: BeeBrain = {
   id: "boozy",
   strategy:
@@ -88,6 +103,17 @@ export const boozy: BeeBrain = {
           desc: `#${i + 1} momentum`,
           intent: { kind: "open", instId: c.s.instId, side: "long", sizeFrac: ENTRY_FRAC, setup: "strict" },
         };
+      for (const c of top) {
+        // One label per coin: ranking owns coins it already claimed, so fills
+        // attribute cleanly (APE_ = ranked pick, SPIKE_ = spike-only pick).
+        const st = spikeSetup(c.s);
+        if (st && !m[`APE_${st.coin}`]) {
+          m[`SPIKE_${st.coin}`] = {
+            desc: `volume spike volZ ${(c.s.volZ ?? 0).toFixed(1)}, pushing up`,
+            intent: { kind: "open", instId: st.instId, side: "long", sizeFrac: ENTRY_FRAC, setup: "strict" },
+          };
+        }
+      }
       return m;
     }
     const s = ctx.view.stats.get(p.instId);
