@@ -22,9 +22,9 @@
   --breezy-glow: rgba(148, 163, 184, 0.45);
   --boozy-glow: rgba(220, 38, 38, 0.45);
 
-  /* Status (reserved; always paired with a glyph: ember-amber gains, blood-red losses) */
-  --good: #e07a1f;
-  --good-text: #ff9838;
+  /* Status (conventional market semantics: green gains, red losses — always paired with a ▲/▼ glyph) */
+  --good: #16a34a;
+  --good-text: #4ade80;
   --warning: #eab308;
   --critical: #b91c1c;
   --critical-text: #ff5555;

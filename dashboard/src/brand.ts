@@ -27,9 +27,9 @@ export const BRAND = {
     axis: "#2d3b34",
     mutedBar: "#27352e",
 
-    // Accent roles: ember-amber for gains, blood-red for losses
-    good: "#e07a1f",
-    goodText: "#ff9838",
+    // Accent roles: green for gains, red for losses (conventional market semantics)
+    good: "#16a34a",
+    goodText: "#4ade80",
     warning: "#eab308",
     critical: "#b91c1c",
     criticalText: "#ff5555",
