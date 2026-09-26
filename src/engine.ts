@@ -698,13 +698,16 @@ export class Engine {
 
     // Hard rule 10: recorded before it is acted on.
     const costUsd = r && r.ok ? r.costUsd : 0;
+    // Rule-dictated hold IS a decision (RIDE) — just not one Jev made. Show it as
+    // such instead of "no call"; jev status + status text say who decided.
+    const shownChoice = r && r.ok ? r.choice : (cached?.choice ?? (ruleHold !== null ? "RIDE" : null));
     const decisionId = db.insertDecision({
       bee: id,
       ts: now,
       stateHash: snap.hash,
       stateJson: JSON.stringify(snap.state),
       menuJson: JSON.stringify(Object.keys(menu)),
-      choice: r && r.ok ? r.choice : (cached?.choice ?? null),
+      choice: shownChoice,
       probabilities: r && r.ok ? r.probabilities : cached ? cached.probabilities : null,
       confidence: r && r.ok ? r.confidence : (cached?.confidence ?? null),
       conviction: r && r.ok ? r.convictionRaw : (cached?.convictionRaw ?? null),
@@ -731,7 +734,7 @@ export class Engine {
     // "no call" row every tick, so the stream shows how close the trigger is.
     const watching = jevStatus === "no_options" && !bee.position && !!brain.idleStatus && risk.action.kind === "none";
     const idle = watching ? (brain.idleDetail?.(ctx) ?? null) : null;
-    this.last[id] = { choice: r && r.ok ? r.choice : (cached?.choice ?? null), top3, confidence: r && r.ok ? r.confidence : (cached?.confidence ?? null), latencyMs: r ? r.latencyMs : null, status, ts: now, idle };
+    this.last[id] = { choice: shownChoice, top3, confidence: r && r.ok ? r.confidence : (cached?.confidence ?? null), latencyMs: r ? r.latencyMs : null, status, ts: now, idle };
     if (watching && now - (this.lastPulseAt[id] ?? 0) < PULSE_MS) {
       db.saveBee(bee, now);
       return;
@@ -743,7 +746,7 @@ export class Engine {
         bee: id,
         decisionId,
         menu: Object.keys(menu),
-        choice: r && r.ok ? r.choice : watching ? "WATCHING" : (cached?.choice ?? null),
+        choice: watching ? "WATCHING" : shownChoice,
         ...(watching ? { watch: status, idle } : {}),
         probabilities: top3.map(([label, p]) => ({ label, p: Number(p.toFixed(3)) })),
         confidence: r && r.ok ? Number(r.confidence.toFixed(3)) : (cached ? Number(cached.confidence.toFixed(3)) : null),
