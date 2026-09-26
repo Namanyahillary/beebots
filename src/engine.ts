@@ -524,6 +524,32 @@ export class Engine {
   }
 
   /**
+   * Profit-lock trail (opt-in via takeProfit.profitLock): once peak unrealised
+   * reaches activateAtUsd, the stop keeps (1 - givebackFrac) of the peak, so a
+   * +$5 run that fades exits near +$4.50 instead of round-tripping to breakeven
+   * or worse. Ratchet-only like every other stop move; computed from live average
+   * entry so pyramid adds self-correct. Returns a status note, or null.
+   */
+  private applyProfitLock(id: BeeId, ctx: BeeContext): string | null {
+    const p = ctx.bee.position;
+    const pol = this.brain(id).takeProfit?.profitLock;
+    if (!p || !pol) return null;
+    const upl = ctx.bee.uplUsd;
+    if (!(upl > 0)) return null;
+    if (p.peakUplUsd == null || upl > p.peakUplUsd) p.peakUplUsd = upl;
+    if (p.peakUplUsd < pol.activateAtUsd) return null;
+    const inst = ctx.view.instruments.get(p.instId);
+    if (!inst || !(p.contracts > 0)) return null;
+    const locked = p.peakUplUsd * (1 - pol.givebackFrac);
+    const perContract = locked / (p.contracts * inst.ctVal);
+    const stop = p.side === "long" ? p.entryPx + perContract : p.entryPx - perContract;
+    if (!Number.isFinite(stop)) return null;
+    if (p.side === "long") p.stopPx = p.stopPx === null ? stop : Math.max(p.stopPx, stop);
+    else p.stopPx = p.stopPx === null ? stop : Math.min(p.stopPx, stop);
+    return `profit-lock +$${locked.toFixed(2)} (peak +$${p.peakUplUsd.toFixed(2)})`;
+  }
+
+  /**
    * Ghost benchmark (caged): ONE row per bee every GHOST_EVERY_TICKS ticks, written ONLY
    * to ghost_decisions via insertGhostDecision. Never touches orders/fills/decisions,
    * never emits bus events. Failures are contained (warn) so the benchmark can never
@@ -703,6 +729,8 @@ export class Engine {
           const note = this.moveStopToBreakeven(id, ctx, ctx.uplR);
           if (note) status = `${status}; ${note}`;
         }
+        const lock = this.applyProfitLock(id, ctx);
+        if (lock) status = `${status}; ${lock}`;
     }
 
     this.recordGhost(id, ctx, brain, menu, now);
@@ -820,6 +848,8 @@ export class Engine {
         const note = this.moveStopToBreakeven(id, ctx, ctx.uplR);
         if (note) benchStatus = `${benchStatus}; ${note}`;
       }
+      const lock = this.applyProfitLock(id, ctx);
+      if (lock) benchStatus = `${benchStatus}; ${lock}`;
     }
     const prev = this.last[id];
     this.last[id] = { choice: null, top3: prev?.top3 ?? [], confidence: null, latencyMs: null, status: benchStatus, ts: now, idle: null };
@@ -1133,6 +1163,7 @@ export class Engine {
             riskUsd: ours?.riskUsd ?? (inst ? Math.abs(theirs.pos) * inst.ctVal * theirs.avgPx * 0.01 : 0),
             trimmedAtR: keepFlags ? (ours!.trimmedAtR ?? null) : null,
             beMoved: keepFlags ? (ours!.beMoved ?? false) : false,
+            peakUplUsd: keepFlags ? (ours!.peakUplUsd ?? null) : null,
           };
           bee.flatSince = null;
         }

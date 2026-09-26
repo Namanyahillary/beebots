@@ -22,6 +22,8 @@ export interface Position {
   trimmedAtR?: number | null;
   /** True once the stop has been moved to breakeven (false = not yet triggered; persisted, survives reconcile). */
   beMoved?: boolean;
+  /** Highest unrealised USD seen on this position (null = not yet measured; persisted, survives reconcile). */
+  peakUplUsd?: number | null;
 }
 
 /** Per-brain opt-in take-profit / breakeven policy (R-multiples; never universal). */
@@ -30,6 +32,13 @@ export interface TakeProfitPolicy {
   trimFrac: number;
   breakevenAtR: number;
   feeBufferR: number;
+  /**
+   * Profit-lock trail (opt-in per brain): once peak unrealised reaches activateAtUsd,
+   * keep (1 - givebackFrac) of the peak via the stop (e.g. peak $5, giveback 0.1 →
+   * exit at +$4.50 on regression). Ratchet-only, computed from live average entry.
+   * Absent = disabled.
+   */
+  profitLock?: { givebackFrac: number; activateAtUsd: number } | null;
 }
 
 export type CapReason = "trade_cap" | "fee_budget" | "loss_stop" | "retired";

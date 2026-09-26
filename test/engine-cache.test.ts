@@ -280,3 +280,58 @@ describe("lockedHold: rule-dictated ride never asks Jev (upstream parity)", () =
     expect(b.position).toBeNull();
   });
 });
+
+describe("applyProfitLock (bank gains, never round-trip to loss)", () => {
+  async function harness() {
+    const { Db } = await import("../src/db.js");
+    const { EventBus } = await import("../src/events.js");
+    const { SimExecutor } = await import("../src/exec/executor.js");
+    const { Engine } = await import("../src/engine.js");
+    const { Jev } = await import("../src/jev.js");
+    const { Alerts } = await import("../src/alerts.js");
+    const cfg = testConfig();
+    const db = new Db(":memory:");
+    const bus = new EventBus(db);
+    const doge = coin("DOGE", {}, 1);
+    const V = view([doge]);
+    const feed = { view: () => V, lastRefreshAt: NOW } as never;
+    const answers = {
+      action: { type: "choice", choice: "RIDE", confidence: 1, probabilities: { RIDE: 1 } },
+      conviction: { type: "score", score: 3, confidence: 0.5, legend: {}, probabilities: {} },
+    };
+    const jev = new Jev({
+      apiKey: "k", model: "m", timeoutMs: 2000, dailyUsdCap: 5, usdPerMTok: 0.042,
+      client: { async systemOne() { return { model: "m", usage: { input_tokens: 10, output_tokens: 0 }, answers } as never; } },
+      now: () => NOW,
+    });
+    const exec = new SimExecutor(() => ({ tickers: V.tickers, instruments: V.instruments }), 0, () => NOW);
+    const engine = new Engine({ cfg, db, feed, jev, exec, bus, alerts: new Alerts(undefined), now: () => NOW });
+    return { engine, V };
+  }
+
+  it("tracks peak and locks 90% via the stop once activated", async () => {
+    const { engine, V } = await harness();
+    type E = { applyProfitLock(id: string, ctx: unknown): string | null };
+    const e = engine as unknown as E;
+    const b = bee("boozy", { uplUsd: 5 });
+    // $5 peak on 100 contracts x $1 with entry 1.0: lock = $4.50 → stop 1.045.
+    b.position = position(coin("DOGE", {}, 1), { contracts: 100, entryPx: 1, riskUsd: 10, stopPx: 0.9 });
+    const c = ctx("boozy", b, V, testConfig(), NOW);
+    const note = e.applyProfitLock("bee3", c as never);
+    expect(note).toContain("+$4.50");
+    expect(b.position!.stopPx).toBeCloseTo(1.045, 8);
+    expect(b.position!.peakUplUsd).toBe(5);
+  });
+
+  it("ignores dust peaks below activation and never loosens", async () => {
+    const { engine, V } = await harness();
+    type E = { applyProfitLock(id: string, ctx: unknown): string | null };
+    const e = engine as unknown as E;
+    const b = bee("boozy", { uplUsd: 1 });
+    b.position = position(coin("DOGE", {}, 1), { contracts: 100, entryPx: 1, riskUsd: 10, stopPx: 1.02 });
+    const c = ctx("boozy", b, V, testConfig(), NOW);
+    expect(e.applyProfitLock("bee3", c as never)).toBeNull();
+    expect(b.position!.stopPx).toBe(1.02);
+    expect(b.position!.peakUplUsd).toBe(1);
+  });
+});

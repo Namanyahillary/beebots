@@ -10,6 +10,7 @@ import type { ScoutEligibleEntry } from "./scout.js";
 export function normalizePosition(p: Position): Position {
   p.trimmedAtR ??= null;
   p.beMoved ??= false;
+  p.peakUplUsd ??= null;
   return p;
 }
 

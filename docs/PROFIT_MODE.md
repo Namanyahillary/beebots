@@ -149,3 +149,11 @@ cap total pyramid risk the same way; mitigated meanwhile because adds happen int
 winners, usually behind a breakeven stop). Fee drag on tiny notionals is the watch
 item, measured not gated. TP/BE triggers gain meaning automatically: riskUsd now
 approximates the budget by construction.
+
+## Profit-lock trail + Grim frequency (shipped)
+Profit-lock: once peak unrealised passes $2 (activation floor against noise exits),
+the stop keeps 90% of peak (boozy only; BE/ATR-trail reconciled by max). A +$5 run
+that fades exits near +$4.50, never round-trips to breakeven. peakUplUsd persists
+like the other one-shot flags. Pyramid adds uncovered (follow-up).
+Frequency: boozy 3 → 6 trades/day via local .env (fee $3 budget unchanged — covers
+~10+ risk-sized trades; binding constraint now measured, not assumed).
