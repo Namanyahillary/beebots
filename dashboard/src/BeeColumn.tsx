@@ -69,8 +69,51 @@ interface Props {
 const STYLE_LABEL: Record<string, string> = { bizzy: "Breakout", breezy: "Trend", boozy: "Momentum" };
 const DEFAULT_STYLE: Record<BeeName, string> = { bee1: "bizzy", bee2: "breezy", bee3: "boozy" };
 
-function EngineHelp({ styleId }: { styleId: string }) {
-  if (styleId === "breezy")
+/** A trigger chip that explains itself: tap for the full rule, status, and where to watch it. */
+function TriggerBadge({ label }: { label: string }) {
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open ]);
+  return (
+    <>
+      <button type="button" className="trigger-badge" onClick={() => setOpen(true)} title="What is Stinger?">
+        {label}
+      </button>
+      {open && (
+        <div className="modal-back" onClick={(e) => e.target === e.currentTarget && setOpen(false)}>
+          <div className="modal" role="dialog" aria-modal="true" aria-labelledby="stinger-title">
+            <button className="modal-x" onClick={() => setOpen(false)} aria-label="Close">
+              ×
+            </button>
+            <h2 id="stinger-title">Stinger entry trigger</h2>
+            <div className="help-body">
+              <p>Stinger is Blaze second entry trigger, alongside the default Williams breakout.</p>
+              <dl>
+                <dt>Rule</dt>
+                <dd>Long only when price sits above the previous day high with rising volume.</dd>
+                <dt>Volume bar</dt>
+                <dd>Volume z-score at 1.0 or more. A starting guess, retuned from fills.</dd>
+                <dt>Williams differs</dt>
+                <dd>Williams fires at today open plus half of yesterday range. Either can trigger first on a fast morning.</dd>
+                <dt>Challenger</dt>
+                <dd>Stinger was copied from a leading Hive bee. It runs beside Williams, never instead of it. The menu labels keep them apart.</dd>
+                <dt>Scoreboard</dt>
+                <dd>Every fill records which trigger fired. Open the Setups panel to see offered versus picked counts per trigger.</dd>
+              </dl>
+              <p>No trigger fired yet means a quiet market, not a broken one.</p>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
+function EngineHelp({ styleId }: { styleId: string }) {  if (styleId === "breezy")
     return (
       <Help title="Engine: Trend">
         <p>This badge names the strategy this slot runs.</p>
@@ -170,9 +213,7 @@ export function BeeColumn({ name, bee, curve, baseline, rank, gap, flash, fills,
                 return fam.length > 0 && trg.length > 0 && !trg.includes(fam) && !fam.includes(trg);
               })
               .map((t) => (
-                <span key={t} className="trigger-badge">
-                  {t.replace(/^Williams breakout$/i, "Williams")}
-                </span>
+                <TriggerBadge key={t} label={t.replace(/^Williams breakout$/i, "Williams")} />
               ))}
             <EngineHelp styleId={styleId} />
           </div>
