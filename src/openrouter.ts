@@ -1,4 +1,4 @@
-// OpenRouter-backed stand-in for the TypeSafe SystemOne client (JEV waitlisted; interim only).
+// OpenRouter routing to the real TypeSafe Jev 1.13 via the Decisions API (interim routing, not imitation).
 // Implements the same SystemOne shape so the Jev class (caps, backoff, fail-closed, OFF_MENU)
 // is reused untouched. Never synthesizes a choice: anything unexpected throws and Jev fails closed.
 
@@ -11,7 +11,7 @@ export interface OpenRouterOpts {
   timeoutMs: number;
 }
 
-const ENDPOINT = "https://openrouter.ai/api/v1/chat/completions";
+const ENDPOINT = "https://openrouter.ai/api/alpha/decisions";
 /** Probabilities must sum to 1 within this tolerance (renormalized); anything wider throws. */
 const PROB_TOLERANCE = 0.05;
 
@@ -27,28 +27,8 @@ export class OpenRouterSystemOne implements SystemOne {
   constructor(private opts: OpenRouterOpts) {}
 
   async systemOne(req: SDK.SystemOneRequest, opts?: SDK.RequestOptions): Promise<SDK.SystemOneResult<SDK.Questions>> {
-    const actionQ = req.questions["action"];
-    const convQ = req.questions["conviction"];
-    if (!actionQ || actionQ.type !== "choice") throw fail("OPENROUTER_BAD_REQUEST", "missing action choice question");
-    if (!convQ || convQ.type !== "score") throw fail("OPENROUTER_BAD_REQUEST", "missing conviction score question");
-    const keys = Object.keys(actionQ.criteria);
-    const rubric = [...convQ.criteria];
-
     const model = req.model ?? this.opts.model;
     const timeoutMs = opts?.timeout ?? this.opts.timeoutMs;
-
-    const system =
-      "You are a trading decision engine. Return EXACTLY this JSON object and nothing else: " +
-      '{"action":{"choice":"<one of the criteria keys verbatim>","confidence":0..1,"probabilities":{"<every key>":p summing to 1}},' +
-      '"conviction":{"score":number,"confidence":0..1}}. ' +
-      "Copy the choice key verbatim from the criteria keys; never invent one.";
-    const user = JSON.stringify({
-      strategy: actionQ.instructions ?? null,
-      state: req.state,
-      criteria: actionQ.criteria,
-      convictionRubric: rubric,
-      convictionInstructions: convQ.instructions ?? null,
-    });
 
     const ctrl = new AbortController();
     let timedOut = false;
@@ -66,14 +46,9 @@ export class OpenRouterSystemOne implements SystemOne {
         res = await globalThis.fetch(ENDPOINT, {
           method: "POST",
           headers: { Authorization: `Bearer ${this.opts.apiKey}`, "Content-Type": "application/json" },
-          body: JSON.stringify({
-            model,
-            messages: [
-              { role: "system", content: system },
-              { role: "user", content: user },
-            ],
-            response_format: { type: "json_object" },
-          }),
+          // TypeSafe's native SystemOne schema, passed through verbatim: same real model,
+          // choices keyed how the engine already builds them.
+          body: JSON.stringify({ model, state: req.state, questions: req.questions }),
           signal: ctrl.signal,
         });
       } catch (err) {
@@ -87,61 +62,112 @@ export class OpenRouterSystemOne implements SystemOne {
       try {
         data = await res.json();
       } catch {
-        throw fail("OPENROUTER_BAD_JSON", "response body is not JSON");
+        throw fail("OPENROUTER_BAD_RESPONSE", "response body is not JSON");
       }
-      const content = isRecord(data) && Array.isArray(data["choices"]) ? (data["choices"][0] as unknown) : undefined;
-      const text = isRecord(content) && isRecord(content["message"]) && typeof content["message"]["content"] === "string" ? (content["message"]["content"] as string) : undefined;
-      if (text === undefined) throw fail("OPENROUTER_BAD_RESPONSE", "missing message content");
-      let parsed: unknown;
-      try {
-        parsed = JSON.parse(text) as unknown;
-      } catch {
-        throw fail("OPENROUTER_BAD_JSON", "message content is not JSON");
+      if (!isRecord(data)) throw fail("OPENROUTER_BAD_RESPONSE", "response envelope is not an object");
+      if (typeof data["model"] !== "string" || (data["model"] as string).length === 0) {
+        throw fail("OPENROUTER_BAD_RESPONSE", "response envelope missing model");
       }
-      const action = isRecord(parsed) ? parsed["action"] : undefined;
-      const conviction = isRecord(parsed) ? parsed["conviction"] : undefined;
-      const choice = isRecord(action) ? action["choice"] : undefined;
-      const probs = isRecord(action) ? action["probabilities"] : undefined;
-      const actionConf = isRecord(action) ? action["confidence"] : undefined;
-      const score = isRecord(conviction) ? conviction["score"] : undefined;
-      const convConf = isRecord(conviction) ? conviction["confidence"] : undefined;
-      if (typeof choice !== "string" || !isRecord(probs) || typeof actionConf !== "number" || !Number.isFinite(actionConf) || typeof score !== "number" || !Number.isFinite(score) || typeof convConf !== "number" || !Number.isFinite(convConf)) {
-        throw fail("OPENROUTER_BAD_JSON", "response missing action/conviction fields");
+      const responseModel = data["model"] as string;
+      const answersRaw = data["answers"];
+      if (!isRecord(answersRaw)) throw fail("OPENROUTER_BAD_RESPONSE", "response envelope missing answers");
+      const usageRaw = data["usage"];
+      const input_tokens =
+        isRecord(usageRaw) && typeof usageRaw["input_tokens"] === "number" && Number.isFinite(usageRaw["input_tokens"])
+          ? (usageRaw["input_tokens"] as number)
+          : undefined;
+      const output_tokens =
+        isRecord(usageRaw) && typeof usageRaw["output_tokens"] === "number" && Number.isFinite(usageRaw["output_tokens"])
+          ? (usageRaw["output_tokens"] as number)
+          : undefined;
+      if (input_tokens === undefined || output_tokens === undefined) {
+        throw fail("OPENROUTER_BAD_RESPONSE", "response envelope missing usage.input_tokens/output_tokens");
       }
-      if (!keys.includes(choice)) throw fail("OFF_MENU", "choice not in menu");
-      const weights = keys.map((k) => probs[k]);
-      if (weights.some((p) => typeof p !== "number" || !Number.isFinite(p) || (p as number) < 0)) {
-        throw fail("OPENROUTER_BAD_PROBABILITIES", "probabilities must be non-negative numbers for every key");
-      }
-      const sum = (weights as number[]).reduce((s, p) => s + p, 0);
-      if (Math.abs(sum - 1) > PROB_TOLERANCE) throw fail("OPENROUTER_BAD_PROBABILITIES", `probabilities sum to ${sum}`);
-      const probabilities: Record<string, number> = {};
-      keys.forEach((k, i) => {
-        probabilities[k] = (weights[i] as number) / sum;
-      });
 
-      const usage = isRecord(data) ? data["usage"] : undefined;
-      const input_tokens = isRecord(usage) && typeof usage["prompt_tokens"] === "number" ? usage["prompt_tokens"] : 0;
-      const output_tokens = isRecord(usage) && typeof usage["completion_tokens"] === "number" ? usage["completion_tokens"] : 0;
-
-      // Structural wrappers the SDK type requires but Jev never reads (it consumes only
-      // score/confidence): the rubric labels verbatim, and a point mass on the rounded score.
-      const legend: Record<string, unknown> = {};
-      rubric.forEach((label, i) => {
-        legend[i] = label;
-      });
-      const rounded = Math.max(0, Math.min(rubric.length - 1, Math.round(score)));
-      const convProbs: Record<string, number> = {};
-      rubric.forEach((_, i) => {
-        convProbs[i] = i === rounded ? 1 : 0;
-      });
+      const mapped: Record<string, unknown> = {};
+      for (const [name, question] of Object.entries(req.questions)) {
+        const q = question as SDK.Question;
+        const a: unknown = (answersRaw as Record<string, unknown>)[name];
+        if (!isRecord(a)) throw fail("OPENROUTER_BAD_RESPONSE", `response envelope missing answer for "${name}"`);
+        if (q.type === "choice") {
+          const criteria = (q as SDK.ChoiceQuestion).criteria as Record<string, unknown>;
+          const keys = Object.keys(criteria);
+          const choice = a["choice"];
+          const confidence = a["confidence"];
+          const probs = a["probabilities"];
+          if (typeof choice !== "string") throw fail("OPENROUTER_BAD_RESPONSE", `answer "${name}" missing choice`);
+          if (!keys.includes(choice)) throw fail("OFF_MENU", "choice not in menu");
+          if (typeof confidence !== "number" || !Number.isFinite(confidence)) {
+            throw fail("OPENROUTER_BAD_RESPONSE", `answer "${name}" missing finite confidence`);
+          }
+          if (!isRecord(probs)) throw fail("OPENROUTER_BAD_RESPONSE", `answer "${name}" missing probabilities`);
+          const weights = keys.map((k) => (probs as Record<string, unknown>)[k]);
+          if (weights.some((p) => typeof p !== "number" || !Number.isFinite(p) || (p as number) < 0)) {
+            throw fail("OPENROUTER_BAD_PROBABILITIES", `answer "${name}" probabilities must be non-negative numbers for every key`);
+          }
+          const sum = (weights as number[]).reduce((s, p) => s + p, 0);
+          if (Math.abs(sum - 1) > PROB_TOLERANCE) throw fail("OPENROUTER_BAD_PROBABILITIES", `answer "${name}" probabilities sum to ${sum}`);
+          const probabilities: Record<string, number> = {};
+          keys.forEach((k, i) => {
+            probabilities[k] = (weights[i] as number) / sum;
+          });
+          mapped[name] = { type: "choice", choice, confidence, probabilities };
+        } else if (q.type === "score") {
+          const rubric = [...((q as SDK.ScoreQuestion).criteria as readonly unknown[])];
+          const score = a["score"];
+          const confidence = a["confidence"];
+          if (typeof score !== "number" || !Number.isFinite(score)) {
+            throw fail("OPENROUTER_BAD_RESPONSE", `answer "${name}" missing finite score`);
+          }
+          if (typeof confidence !== "number" || !Number.isFinite(confidence)) {
+            throw fail("OPENROUTER_BAD_RESPONSE", `answer "${name}" missing finite confidence`);
+          }
+          // Native score answers already carry legend/probabilities; rebuild them only when absent
+          // (Jev never reads them — it consumes only score/confidence — but the SDK type requires them).
+          let legend: Record<string, unknown>;
+          if (isRecord(a["legend"])) legend = a["legend"] as Record<string, unknown>;
+          else {
+            legend = {};
+            rubric.forEach((label, i) => {
+              legend[i] = label;
+            });
+          }
+          let probabilities: Record<string, number>;
+          if (isRecord(a["probabilities"])) {
+            const raw = a["probabilities"] as Record<string, unknown>;
+            probabilities = {};
+            for (const [k, v] of Object.entries(raw)) {
+              if (typeof v !== "number" || !Number.isFinite(v) || v < 0) {
+                throw fail("OPENROUTER_BAD_PROBABILITIES", `answer "${name}" probabilities must be non-negative numbers`);
+              }
+              probabilities[k] = v;
+            }
+            const sum = Object.values(probabilities).reduce((s, p) => s + p, 0);
+            if (Math.abs(sum - 1) > PROB_TOLERANCE) {
+              throw fail("OPENROUTER_BAD_PROBABILITIES", `answer "${name}" probabilities sum to ${sum}`);
+            }
+            for (const k of Object.keys(probabilities)) probabilities[k]! /= sum;
+          } else {
+            const rounded = Math.max(0, Math.min(rubric.length - 1, Math.round(score)));
+            probabilities = {};
+            rubric.forEach((_, i) => {
+              probabilities[i] = i === rounded ? 1 : 0;
+            });
+          }
+          mapped[name] = { type: "score", score, confidence, legend, probabilities };
+        } else if (q.type === "noul") {
+          if (a["type"] !== "noul" || typeof a["noul"] !== "number" || !Number.isFinite(a["noul"] as number)) {
+            throw fail("OPENROUTER_BAD_RESPONSE", `answer "${name}" missing finite noul`);
+          }
+          mapped[name] = { type: "noul", noul: a["noul"] };
+        } else {
+          throw fail("OPENROUTER_BAD_REQUEST", `unsupported question type for "${name}"`);
+        }
+      }
 
       return {
-        model,
-        answers: {
-          action: { type: "choice", choice, confidence: actionConf, probabilities },
-          conviction: { type: "score", score, confidence: convConf, legend, probabilities: convProbs },
-        },
+        model: responseModel,
+        answers: mapped,
         usage: { input_tokens, output_tokens },
       } as SDK.SystemOneResult<SDK.Questions>;
     } finally {

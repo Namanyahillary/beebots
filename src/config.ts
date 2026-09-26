@@ -70,13 +70,13 @@ const EnvSchema = z.object({
   JEV_TIMEOUT_MS: num(2000),
   JEV_DAILY_USD_CAP: num(2),
   JEV_USD_PER_MTOK: num(0.042),
-  // Interim reasoning backend while JEV is waitlisted. "openrouter" reuses the Jev class
-  // (caps, backoff, fail-closed) with an OpenRouter LLM behind the SystemOne shape.
+  // Interim reasoning backend: routing, not imitation — same real Jev 1.13, billed via OpenRouter, no waitlist.
+  // "openrouter" reuses the Jev class (caps, backoff, fail-closed) with the Decisions API behind the SystemOne shape.
   REASONING_BACKEND: z.enum(["jev", "openrouter"]).optional().default("jev"),
   OPENROUTER_API_KEY: opt,
-  OPENROUTER_MODEL: str("openai/gpt-4o-mini"),
-  OPENROUTER_USD_PER_MTOK: num(0.15),
-  /** OpenRouter needs longer than Jev's 2s budget (measured ~1.7s for a trivial prompt). Must stay under TICK_MS. */
+  OPENROUTER_MODEL: str("typesafe/jev-1.13"),
+  OPENROUTER_USD_PER_MTOK: num(0.042),
+  /** Decisions via OpenRouter measured ~3.2s live. Must stay under TICK_MS. */
   OPENROUTER_TIMEOUT_MS: num(8000),
   /** Cached-answer heartbeat: a real Jev call at least every N decide ticks per bee (default 12 ≈ 2 min at 10 s). */
   JEV_HEARTBEAT_TICKS: num(12),
@@ -176,7 +176,7 @@ export interface Config {
   hive: { url: string };
   update: { enabled: boolean; repo: string; version: string };
   settingsPath: string;
-  /** Which reasoning backend feeds Jev.decide. "openrouter" is interim until the TypeSafe key arrives. */
+  /** Which reasoning backend feeds Jev.decide. "openrouter" routes the same real Jev 1.13 via OpenRouter. */
   reasoning: { backend: "jev" | "openrouter" };
   /** Effective Jev opts: model/pricing resolve from the active backend, caps/timeout are shared. */
   jev: { apiKey: string; model: string; timeoutMs: number; dailyUsdCap: number; usdPerMTok: number; heartbeatTicks: number };

@@ -123,13 +123,19 @@ six smaller items — all fixed on this branch before merge:
   not closed round-trips) with hover tooltip.
 
 ## Interim reasoning backend
-JEV is waitlisted, so OpenRouter stands in as the interim reasoning backend
-(`src/openrouter.ts`: `OpenRouterSystemOne implements SystemOne`), swappable back via
-config. Swap-back plan: set `TYPESAFE_API_KEY` + `REASONING_BACKEND=jev` (the default).
-The `Jev` class is reused untouched — daily cap, exponential backoff, fail-closed, and
-`OFF_MENU` rejection all behave exactly as with JEV; the stand-in never synthesizes a
-choice, it throws and the risk layer holds. Per-decision `r.model` records the active
-model so fills attribute to the right backend.
-Calibration caveat: LLM conviction is unvalidated — gates are unchanged, watch conviction
-buckets vs outcomes before trusting them. Cost note: cap mechanics reused unchanged
-(`OPENROUTER_USD_PER_MTOK`, default 0.15); only the per-MTok price differs.
+OpenRouter serves the real Jev 1.13 via the Decisions API (`POST
+https://openrouter.ai/api/alpha/decisions` — verified live, ~3.2s, $0.042/MTok
+input, output free, same as TypeSafe direct). `src/openrouter.ts`
+(`OpenRouterSystemOne implements SystemOne`) passes state/questions/model
+through verbatim and maps the native typed answers straight into
+ChoiceResponse/ScoreResponse — no JSON parsing of model text, no probability
+renormalization beyond a ±0.05 sanity tolerance. The earlier gpt-4o-mini
+imitation never made a live call and is deleted.
+Swap-back plan: set `TYPESAFE_API_KEY` + `REASONING_BACKEND=jev` (the default)
+whenever the waitlist clears. The `Jev` class is reused untouched — daily cap,
+exponential backoff, fail-closed, and `OFF_MENU` rejection all behave exactly
+as with direct JEV. Per-decision `r.model` records the responding model
+(e.g. `typesafe/jev-1.13-20260917`) so fills attribute to the right backend.
+Conviction is now JEV-calibrated, so conviction-gate validation can proceed on
+real semantics. Cost note: cap mechanics reused unchanged
+(`OPENROUTER_USD_PER_MTOK`, default 0.042).
