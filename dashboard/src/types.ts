@@ -85,6 +85,12 @@ export interface DecisionEvent {
   forcedBy: string | null;
   status: string;
   jev: string;
+  /** Labels Jev chose from this tick. Absent on benched rows, which ask nothing. */
+  menu?: string[];
+  /** DB decision id, for linking a fill to the decision that caused it. */
+  decisionId?: number;
+  /** True when Jev's answer was reused from cache instead of a fresh call. */
+  cached?: boolean;
   /** A benched bee's live row: no Jev call, just its position P&L moving. */
   pulse?: boolean;
   /** Flat bee with nothing to ask Jev: what it is watching for (e.g. "SOL is 0.80% from breakout"). */
@@ -106,6 +112,8 @@ export interface FillEvent {
   feeUsd: number;
   realisedUsd: number;
   label: string;
+  /** The decision that caused this fill. Absent on fills from before this field shipped. */
+  decisionId?: number;
 }
 
 export interface CapEvent {

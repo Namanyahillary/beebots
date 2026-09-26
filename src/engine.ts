@@ -720,6 +720,8 @@ export class Engine {
       "decision",
       {
         bee: id,
+        decisionId,
+        menu: Object.keys(menu),
         choice: r && r.ok ? r.choice : watching ? "WATCHING" : (cached?.choice ?? null),
         ...(watching ? { watch: status } : {}),
         probabilities: top3.map(([label, p]) => ({ label, p: Number(p.toFixed(3)) })),
@@ -792,7 +794,7 @@ export class Engine {
         action: risk.action, vetoedBy: null, forcedBy: risk.forcedBy, status: risk.status,
       });
       this.d.bus.emit("decision", {
-        bee: id, choice: null, probabilities: [], confidence: null, conviction: null, latencyMs: null, tokens: null,
+        bee: id, decisionId, choice: null, probabilities: [], confidence: null, conviction: null, latencyMs: null, tokens: null,
         jevUsd: 0, action: describeAction(risk.action), vetoedBy: null, forcedBy: risk.forcedBy, status: risk.status, jev: "no_options",
         ...this.liveChip(id),
       }, now);
@@ -984,6 +986,7 @@ export class Engine {
     const dir = reduceOnly ? "CLOSE" : side === "buy" ? "LONG" : "SHORT";
     bus.emit("fill", {
       bee: id,
+      decisionId,
       coin: inst.coin,
       side,
       purpose,

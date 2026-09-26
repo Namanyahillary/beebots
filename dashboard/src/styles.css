@@ -954,6 +954,98 @@ a.counter.host:hover {
   min-width: 3.4rem;
 }
 
+/* ---------- setups + fills rail cards ---------- */
+.setups-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+.setups-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 0.6rem;
+  align-items: baseline;
+  font-size: 0.8rem;
+}
+.setups-label {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--text-2);
+}
+.setups-context {
+  margin-top: 0.5rem;
+  font-size: 0.78rem;
+}
+.fills-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  max-height: 15rem;
+  overflow: hidden;
+}
+.fill-row {
+  display: grid;
+  grid-template-columns: 3.4rem 1fr auto auto;
+  gap: 0.6rem;
+  align-items: baseline;
+  width: 100%;
+  font: inherit;
+  font-size: 0.82rem;
+  text-align: left;
+  color: var(--text);
+  background: var(--card-2);
+  border: 0;
+  border-left: 3px solid var(--bee);
+  border-radius: 0 0.5rem 0.5rem 0;
+  padding: 0.4rem 0.6rem;
+  cursor: pointer;
+}
+.fill-row:hover {
+  background: color-mix(in srgb, var(--bee) 16%, var(--card-2));
+}
+.fill-bee {
+  font-weight: 700;
+  color: var(--text-2);
+}
+.fill-main {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.fill-purpose {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ---------- trade modal ---------- */
+.trade-grid {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.25rem 1rem;
+  margin: 0.6rem 0;
+  font-size: 0.9rem;
+}
+.trade-grid dt {
+  color: var(--muted);
+}
+.trade-grid dd {
+  margin: 0;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+.trade-choice {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-weight: 700;
+}
+.trade-sub {
+  margin-top: 1rem;
+}
+
 /* ---------- order cards ---------- */
 .toasts {
   position: fixed;
@@ -1150,6 +1242,12 @@ a.counter.host:hover {
   .ticker {
     order: 1;
   }
+  .rail-card.fills {
+    order: 1;
+  }
+  .rail-card.setups {
+    order: 3;
+  }
   .rail-card.blocked {
     order: 2;
   }
@@ -1194,7 +1292,9 @@ a.counter.host:hover {
   }
   .rail-card.board,
   .rail-card.blocked,
-  .rail-card.scout {
+  .rail-card.fills,
+  .rail-card.scout,
+  .rail-card.setups {
     grid-column: 1 / -1;
   }
   .ticker {
