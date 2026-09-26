@@ -185,13 +185,18 @@ describe("breezy: open gate and never flat", () => {
     expect(r.action.kind).toBe("open");
   });
 
-  it("a weak pick while flat becomes the forced minimum in the stronger |score| direction", () => {
+  it("a weak pick while flat is vetoed and never forced (breezy neverForce)", () => {
     const r = run(ctx("breezy", bee("breezy", { flatSince: NOW }), V), breezy, prop(open(BTC.instId, "short", "loose", 5 / 9), 0.69, 3));
     expect(r.vetoedBy).toMatch(/^weak_conviction/);
-    expect(r.forcedBy).toBe("max_flat");
-    expect(r.action).toMatchObject({ kind: "open", instId: BTC.instId, side: "long" });
-    // Floor of half of max, or |score|/9 when larger (score 5 -> 5/9), under the 60% vol cap.
-    expect((r.action as { notionalUsd: number }).notionalUsd).toBeCloseTo((5 / 9) * 666, 5);
+    expect(r.forcedBy).toBeNull();
+    expect(r.action).toMatchObject({ kind: "none" });
+  });
+
+  it("flat past maxFlat with neverForce still holds (no max_flat forcing)", () => {
+    const stale = bee("breezy", { flatSince: NOW - 120 * 60_000 });
+    const r = run(ctx("breezy", stale, V, testConfig(), NOW), breezy, prop({ kind: "hold" }, 1, 0, "HOLD"));
+    expect(r.forcedBy).toBeNull();
+    expect(r.action).toMatchObject({ kind: "none" });
   });
 
   it("low conviction with high probability is still vetoed", () => {
@@ -207,14 +212,15 @@ describe("breezy: open gate and never flat", () => {
     expect(r.forcedBy).toBeNull();
   });
 
-  it("4h cooldown blocks a discretionary flip, but not the never-flat minimum", () => {
+  it("4h cooldown blocks a discretionary flip; flat with neverForce holds instead of forcing", () => {
     const b = bee("breezy", { position: position(BTC), flatSince: null, lastOrderAt: NOW - 60 * 60_000 });
     const flip = run(ctx("breezy", b, V), breezy, prop({ kind: "switch", instId: BTC.instId, side: "short", sizeFrac: 0.5, setup: "loose" }, 0.9, 3));
     expect(flip.vetoedBy).toBe("cooldown 180m");
     const flat = bee("breezy", { flatSince: NOW, lastOrderAt: NOW - 60_000 });
-    const forced = run(ctx("breezy", flat, V), breezy, prop(open(BTC.instId), 0.9, 3));
-    expect(forced.vetoedBy).toBe("cooldown 239m");
-    expect(forced.forcedBy).toBe("max_flat");
+    const held = run(ctx("breezy", flat, V), breezy, prop(open(BTC.instId), 0.9, 3));
+    expect(held.vetoedBy).toBe("cooldown 239m");
+    expect(held.forcedBy).toBeNull();
+    expect(held.action).toMatchObject({ kind: "none" });
   });
 
   it("cooldown is quiet once it has elapsed", () => {

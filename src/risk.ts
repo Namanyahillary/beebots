@@ -15,8 +15,8 @@ export interface Proposal {
   conviction: number;
 }
 
-/** "no_options": the menu was empty, so Jev was not asked (forcing rules still apply). */
-export type JevStatus = "ok" | "unreachable" | "daily_cap" | "no_options";
+/** "no_options": the menu was empty, so Jev was not asked (forcing rules still apply). "rule": a locked rule dictated hold, so Jev was not asked. */
+export type JevStatus = "ok" | "unreachable" | "daily_cap" | "no_options" | "rule";
 
 export interface RiskInput {
   ctx: BeeContext;

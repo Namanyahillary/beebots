@@ -135,6 +135,13 @@ export interface BeeBrain {
   takeProfit?: TakeProfitPolicy;
   /** This bee waits for its setup instead of being forced in when flat (drama rule 2 does not apply). */
   neverForce?: boolean;
+  /**
+   * Rule-determined hold: when non-null (a human-readable reason), the code — not Jev —
+   * dictates holding this tick (e.g. a commit window with no other available move).
+   * The engine still runs full risk evaluation (stops/caps/vetoes fire); only the Jev
+   * call is skipped. Return null whenever any real choice exists.
+   */
+  lockedHold?: (ctx: BeeContext) => string | null;
   /** Status line while flat with nothing on the menu (e.g. "waiting for a breakout"). */
   idleStatus?: (ctx: BeeContext) => string;
   /** Structured version of the idle state (for the dashboard proximity bar).

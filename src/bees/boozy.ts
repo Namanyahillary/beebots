@@ -117,6 +117,27 @@ export const boozy: BeeBrain = {
     return c ? { kind: "open", instId: c.s.instId, side: "long", sizeFrac: ENTRY_FRAC, setup: "loose" } : null;
   },
 
+  /**
+   * Committed ride with no double-down available: the menu would be exactly
+   * {RIDE}, so asking Jev is pure spend with no possible judgment. Stops still
+   * fire in code every tick. Returns null whenever a real choice exists.
+   */
+  lockedHold(ctx) {
+    const p = ctx.bee.position;
+    if (!p) return null;
+    if (minutesSince(p.openedAt, ctx.now) >= BOOZY_MIN_HOLD_MIN) return null;
+    const s = ctx.view.stats.get(p.instId);
+    const inst = ctx.view.instruments.get(p.instId);
+    if (!s || !inst) return null;
+    const max = maxNotionalUsd(ctx);
+    const atr = atr1hPx(s);
+    const steps = max > 0 ? Math.max(0, Math.round((positionNotional(p, s.mid, inst.ctVal) / max - ENTRY_FRAC) / ADD_FRAC)) : 0;
+    const runAtr = atr ? ((p.side === "long" ? 1 : -1) * (s.mid - p.entryPx)) / atr : 0;
+    const doubleDownAvailable = positionNotional(p, s.mid, inst.ctVal) < max * 0.95 && runAtr >= steps + 1;
+    if (doubleDownAvailable) return null;
+    return "required by the rules";
+  },
+
   sizeFrac(intent) {
     // Always enter at 1x; size comes from pyramiding into winners, not from conviction.
     return intent.sizeFrac;

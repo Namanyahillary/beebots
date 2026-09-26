@@ -585,11 +585,24 @@ export class Engine {
     let r: JevResult | null = null;
     let cached: JevCacheEntry | null = null;
     let jevCached = false;
+    let ruleHold: string | null = null;
     const dataAgeMs = now - this.d.feed.lastRefreshAt;
     const maxDataAgeMs = 3 * cfg.dataRefreshMs + 30_000;
     if (jev.capTripped) jevStatus = "daily_cap";
     else if (Object.keys(menu).length === 0) jevStatus = "no_options";
-    else if (jev.downSince !== null) {
+    else if (bee.position && brain.lockedHold) {
+      // Rule-dictated hold (e.g. boozy's commit window with no double-down available):
+      // the menu would be exactly {RIDE}, so asking Jev is pure spend. Risk still runs
+      // below on every tick — stops, caps and vetoes fire in code either way.
+      const reason = brain.lockedHold(ctx);
+      if (reason !== null && menu.RIDE) {
+        jevStatus = "rule";
+        ruleHold = reason;
+        this.jevSkipped[id] = (this.jevSkipped[id] ?? 0) + 1;
+      }
+    }
+    if (ruleHold === null) {
+      if (jev.downSince !== null) {
       // Known outage: bypass the cache so the fail-closed path runs on a live answer.
       r = await jev.decide({ strategy: brain.strategy, state: snap.state, menu, convictionLabels: brain.convictionLabels });
       this.jevMade[id] = (this.jevMade[id] ?? 0) + 1;
@@ -617,13 +630,16 @@ export class Engine {
         if (!r.ok) jevStatus = r.reason === "daily_cap" ? "daily_cap" : "unreachable";
         else this.rememberJevAnswer(id, r, menu, ctx, brain, cur.stale);
       }
-    }
+    } // end inner else (live-or-cached Jev answer)
+    } // end if (ruleHold === null): rule path skips Jev Q&A entirely
     const proposal: Proposal | null =
       r && r.ok
         ? { label: r.choice, intent: menu[r.choice]!.intent, prob: r.probabilities[r.choice] ?? 0, conviction: r.conviction }
         : cached
           ? { label: cached.choice, intent: menu[cached.choice]!.intent, prob: cached.prob, conviction: cached.conviction }
-          : null;
+          : ruleHold !== null && menu.RIDE
+            ? { label: "RIDE", intent: menu.RIDE.intent, prob: 1, conviction: 0 }
+            : null;
 
     // Risk runs EVERY tick, cached or not: stops, caps, spread/funding vetoes and gates
     // all fire in code either way. Only the Jev API call is ever skipped.
@@ -653,23 +669,25 @@ export class Engine {
     let status = risk.status;
     let tpTrim: { fraction: number; uplR: number } | null = null;
     const tpPol = brain.takeProfit;
+    // Rule-dictated hold: name it in the status (stops/vetoes above still win).
+    if (ruleHold !== null && !risk.vetoedBy && !risk.forcedBy) status = `RIDE: ${ruleHold} · Jev not asked`;
     if (tpPol && bee.position && action.kind === "none" && ctx.uplR !== null) {
       const sig = takeProfitSignal(bee.position, ctx.uplR, tpPol);
-        if (sig?.trim && bee.position) {
-          // A trim that rounds below minimum size would no-op every tick without ever
-          // setting trimmedAtR (Finding 2): mark it spent here instead of emitting it.
-          const inst = ctx.view.instruments.get(bee.position.instId);
-          const lots = inst ? roundToLot(bee.position.contracts * sig.trim.fraction, inst) : 0;
-          if (inst && lots >= inst.minSz) {
-            tpTrim = { fraction: sig.trim.fraction, uplR: ctx.uplR };
-            action = { kind: "trim", fraction: sig.trim.fraction };
-            forcedBy = "take_profit";
-            status = `take-profit trim ${Math.round(sig.trim.fraction * 100)}% at +${ctx.uplR.toFixed(1)}R`;
-          } else {
-            bee.position.trimmedAtR = ctx.uplR;
-            log.info("take-profit trim below minimum size, marked spent", { bee: id });
-          }
+      if (sig?.trim && bee.position) {
+        // A trim that rounds below minimum size would no-op every tick without ever
+        // setting trimmedAtR (Finding 2): mark it spent here instead of emitting it.
+        const inst = ctx.view.instruments.get(bee.position.instId);
+        const lots = inst ? roundToLot(bee.position.contracts * sig.trim.fraction, inst) : 0;
+        if (inst && lots >= inst.minSz) {
+          tpTrim = { fraction: sig.trim.fraction, uplR: ctx.uplR };
+          action = { kind: "trim", fraction: sig.trim.fraction };
+          forcedBy = "take_profit";
+          status = `take-profit trim ${Math.round(sig.trim.fraction * 100)}% at +${ctx.uplR.toFixed(1)}R`;
+        } else {
+          bee.position.trimmedAtR = ctx.uplR;
+          log.info("take-profit trim below minimum size, marked spent", { bee: id });
         }
+      }
         if (sig?.moveStopToBe) {
           const note = this.moveStopToBreakeven(id, ctx, ctx.uplR);
           if (note) status = `${status}; ${note}`;

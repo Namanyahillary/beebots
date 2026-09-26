@@ -3,7 +3,7 @@ import { bizzy, fadeSetup, stingerSetup } from "../src/bees/bizzy.js";
 import { boozy, rankCandidates } from "../src/bees/boozy.js";
 import { breezy, breezySizeFrac } from "../src/bees/breezy.js";
 import { buildSnapshot } from "../src/snapshot.js";
-import { bee, coin, ctx, NOW, position, trend, view } from "./fixtures.js";
+import { bee, coin, ctx, NOW, position, testConfig, trend, view } from "./fixtures.js";
 
 const HOLDS = ["HOLD", "HOLD_WINNER", "RIDE"];
 
@@ -207,3 +207,27 @@ describe("bizzy Stinger setup (prev-day-high + rising volume, challenger)", () =
     expect(line).toContain("scout-wide nearest AVAX");
     expect(line).toContain("watch only");
   });
+
+describe("boozy lockedHold (rule-dictated ride skips Jev)", () => {
+  it("locks only when committed with no double-down available", async () => {
+    const { boozy } = await import("../src/bees/boozy.js");
+    const s = coin("DOGE", {}, 1);
+    const v = view([s]);
+    const held = (over = {}) => ctx("boozy", bee("boozy", { uplUsd: 0, ...over }), v, testConfig(), NOW);
+    const pos = (openedAt: number) => position(s, { contracts: 100, openedAt, entryPx: 1, riskUsd: 10, stopPx: null });
+    // Fresh position at entry: committed, no run-up → locked.
+    expect(boozy.lockedHold!(held({ position: { ...pos(NOW - 10 * 60_000), flatSince: null } }))).toBe("required by the rules");
+    // Past the 24h commit window → real choice exists.
+    expect(boozy.lockedHold!(held({ position: { ...pos(NOW - 25 * 60 * 60_000), flatSince: null } }))).toBeNull();
+    // Flat → null (nothing to ride).
+    expect(boozy.lockedHold!(held())).toBeNull();
+  });
+});
+
+describe("breezy neverForce (profit mode: no forced entries)", () => {
+  it("flag set and waiting line names the strongest signal", () => {
+    expect(breezy.neverForce).toBe(true);
+    const v = view([coin("BTC", { trend: trend({ score: -4 }) }, 80000), coin("ETH", { trend: trend({ score: 2 }) }, 2700)]);
+    expect(breezy.idleStatus!(ctx("breezy", bee("breezy"), v))).toContain("BTC");
+  });
+});

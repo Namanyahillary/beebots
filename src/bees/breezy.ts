@@ -38,9 +38,20 @@ export function strongerCoin(stats: CoinStats[]): CoinStats | undefined {
 export const breezy: BeeBrain = {
   id: "breezy",
   strategy:
-    "You are breezy-bee, the calculated one. Trend following on BTC and ETH with a 9-slice Donchian ensemble on 4h bars (score -9..+9: long slices on minus short slices on). Ride winners, trade rarely, stay positioned with a real position (at least 1x equity). The code keeps your position at its target size. Open or flip only on a strong, clear trend; otherwise hold. Add only to a winner above +1R. Trim half when the score has fallen by 3 or more.",
+    "You are breezy-bee, the calculated one. Trend following on BTC and ETH with a 9-slice Donchian ensemble on 4h bars (score -9..+9: long slices on minus short slices on). Trade rarely: when flat with no strong, clear trend, stay out — cash is a position. Open or flip only on a strong, clear trend; otherwise hold. The code keeps your position at its target size. Add only to a winner above +1R. Trim half when the score has fallen by 3 or more.",
   convictionLabels: ["weak", "fair", "strong", "overwhelming"],
   openGate: { minConviction: 2, minProb: (ctx) => ctx.cfg.breezy.minOpenProb },
+  // Profit mode: never forced in. A 4h trend system ordered in every tick it is
+  // flat contradicts its own timeframe (see 02:00 forced open over a weak-conviction
+  // veto). Flat with no setup is a valid state, not a problem to fix.
+  neverForce: true,
+
+  idleStatus(ctx) {
+    // Nearest thing to a tradable trend, for the waiting line.
+    const s = strongerCoin(coinStats(ctx));
+    if (!s?.trend) return "waiting for a clear trend";
+    return `waiting for a clear trend (strongest signal ${s.coin} ${s.trend.score > 0 ? "+" : ""}${s.trend.score})`;
+  },
 
   universe(ctx) {
     return coinStats(ctx)

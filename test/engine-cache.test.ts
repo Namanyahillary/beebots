@@ -230,3 +230,53 @@ describe("no trim repeat from stale cache after execution (Finding 1)", () => {
     expect(made()).toBe(1); // no fresh call: identical menu+state reuses the answer
   });
 });
+
+describe("lockedHold: rule-dictated ride never asks Jev (upstream parity)", () => {
+  async function boozyHarness(stopPx: number | null) {
+    const { Db } = await import("../src/db.js");
+    const { EventBus } = await import("../src/events.js");
+    const { SimExecutor } = await import("../src/exec/executor.js");
+    const { Engine } = await import("../src/engine.js");
+    const { Jev } = await import("../src/jev.js");
+    const { Alerts } = await import("../src/alerts.js");
+    const cfg = testConfig();
+    const db = new Db(":memory:");
+    const bus = new EventBus(db);
+    const doge = coin("DOGE", {}, 1);
+    const V = view([doge]);
+    const feed = { view: () => V, lastRefreshAt: NOW } as never;
+    const answers = {
+      action: { type: "choice", choice: "RIDE", confidence: 1, probabilities: { RIDE: 1 } },
+      conviction: { type: "score", score: 3, confidence: 0.5, legend: {}, probabilities: {} },
+    };
+    const jev = new Jev({
+      apiKey: "k", model: "m", timeoutMs: 2000, dailyUsdCap: 5, usdPerMTok: 0.042,
+      client: { async systemOne() { return { model: "m", usage: { input_tokens: 100, output_tokens: 0 }, answers } as never; } },
+      now: () => NOW,
+    });
+    const exec = new SimExecutor(() => ({ tickers: V.tickers, instruments: V.instruments }), 0.0005, () => NOW);
+    const engine = new Engine({ cfg, db, feed, jev, exec, bus, alerts: new Alerts(undefined), now: () => NOW });
+    const b = bee("boozy", { uplUsd: 0 });
+    b.position = position(doge, { contracts: 100, entryPx: 1, riskUsd: 10, stopPx, openedAt: NOW - 10 * 60_000, flatSince: null });
+    engine.bees["bee3"] = b;
+    type E = { decide(id: string, now: number): Promise<void>; jevMade: Record<string, number>; last: Record<string, { status: string }> };
+    const e = engine as unknown as E;
+    return { b, decide: (t: number) => e.decide("bee3", t), made: () => e.jevMade["bee3"] ?? 0, status: () => e.last["bee3"]?.status ?? "" };
+  }
+
+  it("committed ride with no double-down: zero Jev calls, status names the rule", async () => {
+    const { b, decide, made, status } = await boozyHarness(null);
+    await decide(NOW);
+    expect(made()).toBe(0);
+    expect(b.position).not.toBeNull();
+    expect(status()).toContain("required by the rules");
+    expect(status()).toContain("Jev not asked");
+  });
+
+  it("stop still fires under a locked hold without asking Jev", async () => {
+    const { b, decide, made } = await boozyHarness(1.5);
+    await decide(NOW);
+    expect(made()).toBe(0);
+    expect(b.position).toBeNull();
+  });
+});
