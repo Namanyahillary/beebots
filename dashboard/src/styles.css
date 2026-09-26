@@ -723,7 +723,7 @@ body,
 }
 .costs {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   gap: 0.4rem;
   border-top: 1px solid var(--line);
   padding-top: 0.65rem;

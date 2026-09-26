@@ -312,6 +312,10 @@ export function BeeColumn({ name, bee, curve, baseline, rank, gap, flash, fills,
       </div>
 
       <div className="costs num">
+        <div title="Closed-trade P&L so far (stops, takes, trims). Excludes the open position, fees, funding and Jev spend.">
+          <span className="eyebrow">realised</span>
+          {signed(bee?.totals.realisedUsd ?? 0)}
+        </div>
         <div>
           <span className="eyebrow">fees</span>
           {money(bee?.totals.feesUsd ?? 0)}
