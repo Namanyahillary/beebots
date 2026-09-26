@@ -121,3 +121,15 @@ six smaller items — all fixed on this branch before merge:
   non-decision events merged by id. No new endpoint.
 - "Trades today" relabeled "Entries today" (counter increments on entries opened,
   not closed round-trips) with hover tooltip.
+
+## Interim reasoning backend
+JEV is waitlisted, so OpenRouter stands in as the interim reasoning backend
+(`src/openrouter.ts`: `OpenRouterSystemOne implements SystemOne`), swappable back via
+config. Swap-back plan: set `TYPESAFE_API_KEY` + `REASONING_BACKEND=jev` (the default).
+The `Jev` class is reused untouched — daily cap, exponential backoff, fail-closed, and
+`OFF_MENU` rejection all behave exactly as with JEV; the stand-in never synthesizes a
+choice, it throws and the risk layer holds. Per-decision `r.model` records the active
+model so fills attribute to the right backend.
+Calibration caveat: LLM conviction is unvalidated — gates are unchanged, watch conviction
+buckets vs outcomes before trusting them. Cost note: cap mechanics reused unchanged
+(`OPENROUTER_USD_PER_MTOK`, default 0.15); only the per-MTok price differs.

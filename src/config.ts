@@ -70,6 +70,12 @@ const EnvSchema = z.object({
   JEV_TIMEOUT_MS: num(2000),
   JEV_DAILY_USD_CAP: num(2),
   JEV_USD_PER_MTOK: num(0.042),
+  // Interim reasoning backend while JEV is waitlisted. "openrouter" reuses the Jev class
+  // (caps, backoff, fail-closed) with an OpenRouter LLM behind the SystemOne shape.
+  REASONING_BACKEND: z.enum(["jev", "openrouter"]).optional().default("jev"),
+  OPENROUTER_API_KEY: opt,
+  OPENROUTER_MODEL: str("openai/gpt-4o-mini"),
+  OPENROUTER_USD_PER_MTOK: num(0.15),
   /** Cached-answer heartbeat: a real Jev call at least every N decide ticks per bee (default 12 ≈ 2 min at 10 s). */
   JEV_HEARTBEAT_TICKS: num(12),
   TICK_MS: num(10_000),
@@ -168,6 +174,9 @@ export interface Config {
   hive: { url: string };
   update: { enabled: boolean; repo: string; version: string };
   settingsPath: string;
+  /** Which reasoning backend feeds Jev.decide. "openrouter" is interim until the TypeSafe key arrives. */
+  reasoning: { backend: "jev" | "openrouter" };
+  /** Effective Jev opts: model/pricing resolve from the active backend, caps/timeout are shared. */
   jev: { apiKey: string; model: string; timeoutMs: number; dailyUsdCap: number; usdPerMTok: number; heartbeatTicks: number };
   tickMs: number;
   dataRefreshMs: number;
@@ -209,9 +218,21 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, settings: Setti
   const e = parsed.data as Record<string, unknown> & z.infer<typeof EnvSchema>;
   const mode: Mode = e.DRY_RUN ? "dry" : e.MODE;
 
-  const jevKey = e.TYPESAFE_API_KEY ?? settings?.jevKey;
+  const backend = e.REASONING_BACKEND;
+  let jevKey: string | undefined;
+  let jevModel: string;
+  let jevUsdPerMTok: number;
+  if (backend === "openrouter") {
+    jevKey = e.OPENROUTER_API_KEY;
+    jevModel = e.OPENROUTER_MODEL;
+    jevUsdPerMTok = e.OPENROUTER_USD_PER_MTOK;
+  } else {
+    jevKey = e.TYPESAFE_API_KEY ?? settings?.jevKey;
+    jevModel = e.JEV_MODEL;
+    jevUsdPerMTok = e.JEV_USD_PER_MTOK;
+  }
   const missing: string[] = [];
-  if (!jevKey) missing.push("TYPESAFE_API_KEY");
+  if (!jevKey) missing.push(backend === "openrouter" ? "OPENROUTER_API_KEY" : "TYPESAFE_API_KEY");
   if (mode === "live" && e.LIVE_ACK !== LIVE_ACK_PHRASE) {
     throw new ConfigError(`MODE=live moves real money. Set LIVE_ACK=${LIVE_ACK_PHRASE} to confirm you accept the risk, or go back to DRY_RUN=true.`);
   }
@@ -267,12 +288,13 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, settings: Setti
     hive: { url: e.HIVE_URL.replace(/\/+$/, "") },
     update: { enabled: e.UPDATE_CHECK, repo: e.UPDATE_REPO, version: e.APP_VERSION },
     settingsPath: e.SETTINGS_PATH,
+    reasoning: { backend },
     jev: {
       apiKey: jevKey!,
-      model: e.JEV_MODEL,
+      model: jevModel,
       timeoutMs: e.JEV_TIMEOUT_MS,
       dailyUsdCap: e.JEV_DAILY_USD_CAP,
-      usdPerMTok: e.JEV_USD_PER_MTOK,
+      usdPerMTok: jevUsdPerMTok,
       heartbeatTicks: Math.max(1, Math.round(e.JEV_HEARTBEAT_TICKS)),
     },
     tickMs: Math.max(1000, e.TICK_MS),

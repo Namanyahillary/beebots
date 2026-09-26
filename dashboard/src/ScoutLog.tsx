@@ -363,15 +363,20 @@ export function ScoutLog() {
         <span className="eyebrow">
           Scout log{" "}
           <Help title="Scout log">
-            <p>Shortlist transitions and deltas over time. Screening context, not signals.</p>
+            <p>Each row compares this shortlist against the previous one. Only changes are listed.</p>
             <dl>
-              <dt>Deltas</dt>
-              <dd>▲ green shows newly-entered coins; ▼ red shows dropped coins; ⚡ highlighted coins crossed through their breakout trigger.</dd>
-              <dt>Detail</dt>
-              <dd>Coins staying in the screen collapse into a count. Tap any row to inspect its full eligible and excluded lists.</dd>
-              <dt>Trading</dt>
-              <dd>Scout never gates trading; each wolf hunts its own universe.</dd>
+              <dt>In (+n, green)</dt>
+              <dd>A coin that was not on the shortlist and now is.</dd>
+              <dt>Out (−n, red)</dt>
+              <dd>A coin that was on the shortlist and fell off, usually failed spread, volume or funding screens.</dd>
+              <dt>Moved (⚡n, amber)</dt>
+              <dd>A coin still on the shortlist whose situation changed a lot: either it pushed through its trigger line, or its distance to the trigger shifted by a point or more, or its trend direction flipped.</dd>
+              <dt>Trigger</dt>
+              <dd>Each coin has a breakout line at today open plus half of yesterday range. The percent beside a coin is its distance to that line. Positive means below it. Zero or negative means price already pushed through.</dd>
+              <dt>Quiet rows</dt>
+              <dd>Coins that did not change collapse into a count. A row with no badges at all means nothing moved.</dd>
             </dl>
+            <p>Screening context, not signals. Nothing here trades.</p>
           </Help>
         </span>
         <span className="num dim">screening context, not signals</span>

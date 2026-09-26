@@ -11,6 +11,7 @@ import { Hive, hivePath } from "./hive.js";
 import { OkxExecutor, SimExecutor, type Executor } from "./exec/executor.js";
 import { Jev } from "./jev.js";
 import { log, setLogLevel } from "./log.js";
+import { OpenRouterSystemOne } from "./openrouter.js";
 import { MarketFeed } from "./market/data.js";
 import { createOkxCli } from "./okx/cli.js";
 import { createNewsSource } from "./okx/news.js";
@@ -75,7 +76,10 @@ function runSetup() {
 
 async function main() {
   const settings = loadSettings(SETTINGS_PATH);
-  if (!settings && !process.env.TYPESAFE_API_KEY?.trim()) return runSetup();
+  // The Setup gate needs the key for the active reasoning backend (openrouter is interim until the TypeSafe key arrives).
+  const setupBackend = (process.env.REASONING_BACKEND?.trim() || "jev").toLowerCase();
+  const hasReasoningKey = setupBackend === "openrouter" ? !!process.env.OPENROUTER_API_KEY?.trim() : !!process.env.TYPESAFE_API_KEY?.trim();
+  if (!settings && !hasReasoningKey) return runSetup();
   let cfg;
   try {
     cfg = loadConfig({ ...process.env, SETTINGS_PATH }, settings);
@@ -87,7 +91,7 @@ async function main() {
     throw err;
   }
   setLogLevel(cfg.logLevel);
-  log.info("beebots engine starting", { mode: cfg.mode, tickMs: cfg.tickMs, dataRefreshMs: cfg.dataRefreshMs, jevModel: cfg.jev.model });
+  log.info("beebots engine starting", { mode: cfg.mode, tickMs: cfg.tickMs, dataRefreshMs: cfg.dataRefreshMs, reasoningBackend: cfg.reasoning.backend, jevModel: cfg.jev.model });
 
   const db = new Db(cfg.dbPath);
   const bus = new EventBus(db);
@@ -121,7 +125,13 @@ async function main() {
       : new OkxExecutor(cli, cfg.creds, demo, (id) => feed.view().instruments.get(id), cfg.risk.maxLeverage);
 
   const startOfDay = Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), new Date().getUTCDate());
-  const jev = new Jev({ ...cfg.jev, spentTodayUsd: db.jevSpendSince(startOfDay) });
+  const jevOpts = { ...cfg.jev, spentTodayUsd: db.jevSpendSince(startOfDay) };
+  // Interim backend: OpenRouter answers through the same Jev class (caps, backoff, fail-closed unchanged).
+  // Per-decision r.model records the active model, so attribution distinguishes the backends.
+  const jev =
+    cfg.reasoning.backend === "openrouter"
+      ? new Jev({ ...jevOpts, client: new OpenRouterSystemOne({ apiKey: cfg.jev.apiKey, model: cfg.jev.model, timeoutMs: cfg.jev.timeoutMs }) })
+      : new Jev(jevOpts);
 
   // `deploy/close.sh` drops this file into the data volume to end the experiment cleanly (see Engine.windDown).
   const closeFlag = join(dirname(cfg.dbPath), `close-${cfg.mode}`);
