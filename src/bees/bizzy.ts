@@ -77,11 +77,21 @@ export const bizzy: BeeBrain = {
   },
 
   idleStatus(ctx) {
-    const next = breakoutStats(ctx)
-      .map((s) => ({ coin: s.coin, pct: toTrigger(s) }))
-      .filter((x): x is { coin: string; pct: number } => x.pct !== null)
-      .sort((a, b) => a.pct - b.pct)[0];
-    return next ? `${next.coin} is ${next.pct.toFixed(2)}% from breakout` : "waiting for today's breakout levels";
+    const near = (stats: CoinStats[]) =>
+      stats
+        .map((s) => ({ coin: s.coin, pct: toTrigger(s) }))
+        .filter((x): x is { coin: string; pct: number } => x.pct !== null)
+        .sort((a, b) => a.pct - b.pct)[0];
+    const own = near(breakoutStats(ctx));
+    const base = own ? `${own.coin} is ${own.pct.toFixed(2)}% from breakout` : "waiting for today's breakout levels";
+    // Scout-wide intel (info only): nearest trigger across every coin with breakout
+    // data, even outside bizzy's 4. Bizzy can only trade its own list — a nearer
+    // outside coin is scouting visibility, never an order.
+    const wide = near(
+      [...ctx.view.stats.values()].filter((s) => !!s.breakout && s.spreadBp <= ctx.knobs.spreadGateBps),
+    );
+    if (wide && wide.coin !== own?.coin) return `${base}; scout-wide nearest ${wide.coin} ${wide.pct.toFixed(2)}% (watch only)`;
+    return base;
   },
 
   universe(ctx) {

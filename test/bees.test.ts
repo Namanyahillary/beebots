@@ -186,3 +186,15 @@ describe("bizzy Stinger setup (prev-day-high + rising volume, challenger)", () =
     expect(m.STINGER_SOL!.intent).toMatchObject({ kind: "open", side: "long", setup: "strict" });
   });
 });
+  it("idle line adds scout-wide nearest trigger outside bizzy's list (watch only)", () => {
+    const lvl = { dayOpen: 100, prevRange: 4, trigger: 102, prevHigh: 99 };
+    // Own nearest: SOL 0.99% away; AVAX (outside list) nearer at 0.10%.
+    const v = view([
+      coin("SOL", { breakout: lvl }, 101),
+      coin("AVAX", { breakout: { dayOpen: 50, prevRange: 2, trigger: 51, prevHigh: 49 } }, 50.95),
+    ]);
+    const line = bizzy.idleStatus!(ctx("bizzy", bee("bizzy"), v));
+    expect(line).toContain("SOL is 0.99% from breakout");
+    expect(line).toContain("scout-wide nearest AVAX");
+    expect(line).toContain("watch only");
+  });
