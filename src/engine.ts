@@ -162,8 +162,10 @@ export function cacheReusable(entry: JevCacheEntry, cur: CacheNow, ticksSinceAsk
  */
 export function ghostPick(brain: BeeBrain, ctx: BeeContext, menu: Menu): { choice: string | null; reason: string; detail: unknown } {
   void brain; // The pick reads the menu the brain built; scoring below is intentionally brain-agnostic.
+  const midOf = (instId: string): number | null =>
+    ctx.view.tickers.get(instId)?.mid ?? ctx.view.stats.get(instId)?.mid ?? null;
   const p = ctx.bee.position;
-  if (p) return { choice: "hold", reason: "ghost_hold_position", detail: { coin: p.coin, side: p.side } };
+  if (p) return { choice: "hold", reason: "ghost_hold_position", detail: { coin: p.coin, side: p.side, mid: midOf(p.instId) } };
   const cands = Object.entries(menu)
     .filter(([, o]) => o.intent.kind === "open" && (o.intent as Extract<Intent, { kind: "open" }>).setup === "strict")
     .map(([label, o]) => {
@@ -174,7 +176,7 @@ export function ghostPick(brain: BeeBrain, ctx: BeeContext, menu: Menu): { choic
     .sort((a, b) => b.score - a.score || (a.label < b.label ? -1 : a.label > b.label ? 1 : 0));
   const best = cands[0];
   if (!best) return { choice: null, reason: "ghost_no_strict_setup", detail: null };
-  return { choice: best.label, reason: "ghost_top_score", detail: { instId: best.instId, side: best.side, score: best.score } };
+  return { choice: best.label, reason: "ghost_top_score", detail: { instId: best.instId, side: best.side, score: best.score, mid: midOf(best.instId) } };
 }
 
 /**
