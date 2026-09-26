@@ -48,7 +48,7 @@ CREATE TABLE IF NOT EXISTS decisions (
   id INTEGER PRIMARY KEY, bee TEXT NOT NULL, ts INTEGER NOT NULL,
   state_hash TEXT, state_json TEXT, menu_json TEXT,
   choice TEXT, probabilities_json TEXT, confidence REAL, conviction REAL,
-  latency_ms INTEGER, input_tokens INTEGER, jev_cost_usd REAL NOT NULL DEFAULT 0, jev_error TEXT, jev_cached INTEGER NOT NULL DEFAULT 0,
+  latency_ms INTEGER, input_tokens INTEGER, jev_cost_usd REAL NOT NULL DEFAULT 0, jev_error TEXT, jev_cached INTEGER NOT NULL DEFAULT 0, model TEXT,
   action_json TEXT NOT NULL, vetoed_by TEXT, forced_by TEXT, status TEXT
 );
 CREATE INDEX IF NOT EXISTS decisions_bee_ts ON decisions(bee, ts);
@@ -105,6 +105,8 @@ export interface DecisionRow {
   jevError: string | null;
   /** True when the Jev answer was reused from the per-bee cache (no API call this tick). */
   jevCached?: boolean | null;
+  /** Reasoning model that produced this decision (distinguishes Jev vs interim backends). */
+  model?: string | null;
   action: unknown;
   vetoedBy: string | null;
   forcedBy: string | null;
@@ -173,10 +175,13 @@ export class Db {
     this.raw = new DatabaseSync(path);
     this.raw.exec("PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL; PRAGMA busy_timeout = 5000;");
     this.raw.exec(SCHEMA);
-    // Existing DBs predate jev_cached: backfill the column once. Fresh DBs already have it via SCHEMA.
+    // Existing DBs predate jev_cached/model: backfill the columns once. Fresh DBs already have them via SCHEMA.
     const cols = this.raw.prepare(`PRAGMA table_info(decisions)`).all() as Array<{ name: string }>;
     if (!cols.some((c) => c.name === "jev_cached")) {
       this.raw.exec(`ALTER TABLE decisions ADD COLUMN jev_cached INTEGER NOT NULL DEFAULT 0`);
+    }
+    if (!cols.some((c) => c.name === "model")) {
+      this.raw.exec(`ALTER TABLE decisions ADD COLUMN model TEXT`);
     }
   }
 
@@ -184,12 +189,12 @@ export class Db {
     const r = this.raw
       .prepare(
         `INSERT INTO decisions (bee, ts, state_hash, state_json, menu_json, choice, probabilities_json, confidence, conviction,
-          latency_ms, input_tokens, jev_cost_usd, jev_error, jev_cached, action_json, vetoed_by, forced_by, status)
-         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+          latency_ms, input_tokens, jev_cost_usd, jev_error, jev_cached, model, action_json, vetoed_by, forced_by, status)
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
       )
       .run(
         d.bee, d.ts, d.stateHash, d.stateJson, d.menuJson, d.choice, d.probabilities ? JSON.stringify(d.probabilities) : null,
-        d.confidence, d.conviction, d.latencyMs, d.inputTokens, d.jevCostUsd, d.jevError, d.jevCached ? 1 : 0, JSON.stringify(d.action),
+        d.confidence, d.conviction, d.latencyMs, d.inputTokens, d.jevCostUsd, d.jevError, d.jevCached ? 1 : 0, d.model ?? null, JSON.stringify(d.action),
         d.vetoedBy, d.forcedBy, d.status,
       );
     return Number(r.lastInsertRowid);

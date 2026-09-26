@@ -727,6 +727,7 @@ export class Engine {
       jevCostUsd: costUsd,
       jevError: r && !r.ok ? `${r.reason}${r.error ? `: ${r.error.code} ${r.error.message}` : ""}` : null,
       jevCached,
+      model: r && r.ok ? r.model : null,
       action,
       vetoedBy: risk.vetoedBy,
       forcedBy,
