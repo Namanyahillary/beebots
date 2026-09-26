@@ -68,7 +68,7 @@ describe("menuHashFor", () => {
 });
 
 describe("stateHashFor", () => {
-  it("ignores mid moves but reacts to score, uplR, cap and position changes", () => {
+  it("ignores mid AND uplR/mark moves, reacts to score, cap and position changes", () => {
     const b = bee("breezy");
     const base = stateHashFor(ctx("breezy", b, V));
     const moved = view([coin("SOL", {}, 105), BTC]);
@@ -80,12 +80,10 @@ describe("stateHashFor", () => {
     const pos = bee("breezy", { position: position(SOL), flatSince: null });
     expect(stateHashFor(ctx("breezy", pos, V))).not.toBe(base);
   });
-  it("rounds uplR: dust does not bust the cache, a real move does", () => {
+  it("uplR moves never bust the cache: uplR-driven actions (stops, TP/BE) run on live values in code", () => {
     const lo = bee("breezy", { position: position(SOL, { riskUsd: 10 }), uplUsd: 1.44, flatSince: null });
-    const lo2 = bee("breezy", { position: position(SOL, { riskUsd: 10 }), uplUsd: 1.46, flatSince: null });
-    const hi = bee("breezy", { position: position(SOL, { riskUsd: 10 }), uplUsd: 2.5, flatSince: null });
-    expect(stateHashFor(ctx("breezy", lo2, V))).toBe(stateHashFor(ctx("breezy", lo, V)));
-    expect(stateHashFor(ctx("breezy", hi, V))).not.toBe(stateHashFor(ctx("breezy", lo, V)));
+    const hi = bee("breezy", { position: position(SOL, { riskUsd: 10 }), uplUsd: 25, flatSince: null });
+    expect(stateHashFor(ctx("breezy", hi, V))).toBe(stateHashFor(ctx("breezy", lo, V)));
   });
 });
 

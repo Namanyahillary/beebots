@@ -50,8 +50,6 @@ const AGG_ALERT_MS = 10 * 60_000;
 // fail-closed path runs on a live answer.
 
 const sha16 = (s: string) => createHash("sha256").update(s).digest("hex").slice(0, 16);
-const r1 = (x: number | null | undefined): number | null =>
-  x === null || x === undefined || !Number.isFinite(x) ? null : Number(x.toFixed(1));
 
 /** Sorted labels + intent kinds/targets. Size fracs rounded: equity-driven float dust must not bust the cache. */
 export function menuHashFor(menu: Menu): string {
@@ -82,16 +80,23 @@ export function menuHashFor(menu: Menu): string {
  * stop logic in risk.ts watches exits in code) and wall-clock held/flat minutes
  * (time stops and max-flat forcing run in code every tick regardless of the answer).
  */
+/**
+ * Reuse predicate (tuned from live data: continuous marks in the hash held the
+ * skip rate at ~1%). Only DISCRETE, decision-relevant state is hashed: integer
+ * scores, position identity, cap. Continuously-varying values are deliberately
+ * excluded because every action they drive already runs on LIVE values in code
+ * every tick: stops/caps/vetoes in applyRisk, TP/BE in takeProfitSignal. Veto
+ * and gate flips fail safe — risk vetoes a stale "open" into a hold.
+ */
 export function stateHashFor(ctx: BeeContext): string {
   const coins = [...ctx.view.stats.values()]
     .sort((a, b) => (a.instId < b.instId ? -1 : 1))
-    .map((s) => [s.coin, s.trend?.score ?? null, r1(s.fundingZ), r1(s.spreadBp)]);
+    .map((s) => [s.coin, s.trend?.score ?? null]);
   const p = ctx.bee.position;
   return sha16(
     JSON.stringify({
       coins,
       news: ctx.view.newsAvailable,
-      uplR: r1(ctx.uplR),
       pos: p ? `${p.side}:${p.coin}` : "flat",
       cap: ctx.bee.cap,
     }),

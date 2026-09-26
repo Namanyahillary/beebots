@@ -14,9 +14,18 @@ Was: ~40k JEV calls/day → ~8 orders. Now: `risk.ts` runs every tick (stops, ca
 vetoes all still fire in code); only the JEV *API call* is skipped when menu + material
 state are unchanged, reusing the last answer while fresh. Heartbeat forces a real call
 (≥ every 12 ticks) so outage detection keeps working. Per-bee counters: calls made /
-skipped / est. $ saved, visible in snapshot. Invalidates on: menu change, top-score
-flip, funding/spread-gate flips, uplR move, position/cap/staleness change. Failures
-never populate the cache. See `src/engine.ts` (cache + `storeScoutIfChanged` neighbor).
+skipped / est. $ saved, visible in snapshot. Invalidates on: menu change, score change,
+top-score flip, position open/close/fill, cap change, data-staleness change. (uplR and
+quote/funding-value moves deliberately do NOT invalidate — see tuning note below.)
+Failures never populate the cache. See `src/engine.ts`.
+
+**Live tuning (found from running state, not theory):** the first predicate hashed
+continuous marks (`uplR`, funding/spread values) and the skip rate measured **~1%** —
+the gate was nearly dead. Root cause: mark-to-market moves every tick. Fix: hash only
+discrete decision-relevant state (integer scores, position, cap); every uplR-driven
+action already runs on live values in code (stops, TP/BE, vetoes fail safe into hold).
+Re-measured live: **~85% skip rate**, spend negligible, orders still flowing. Lesson:
+hash what changes *decisions*, never what changes *marks*.
 
 ### 2. Take-profit ladder + breakeven stops (per-brain opt-in, never universal)
 Pure `takeProfitSignal()` in `risk.ts`, wired post-risk in the engine through existing
