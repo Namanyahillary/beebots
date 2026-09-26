@@ -114,3 +114,10 @@ six smaller items — all fixed on this branch before merge:
 - Residual note (not fixed, by design): a *fresh* JEV re-pick of TRIM_HALF on consecutive
   ticks is JEV's judgment on fresh state — same as pre-branch behavior, not a cache bug.
   If fills show trim-churn, consider a one-shot decay-trim or trim cooldown next.
+
+## UI fixes (visibility batch)
+- Fills card showed "none yet" with fills in the DB: the /history 400-event window
+  was 100% decisions. `recentEvents` now returns last-N decisions + last-50
+  non-decision events merged by id. No new endpoint.
+- "Trades today" relabeled "Entries today" (counter increments on entries opened,
+  not closed round-trips) with hover tooltip.
