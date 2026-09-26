@@ -82,3 +82,13 @@ describe("config", () => {
     expect(c.risk.maxLeverage).toBe(2);
   });
 });
+
+describe("openrouter timeout", () => {
+  it("uses the OpenRouter budget under tick time on that backend", async () => {
+    const { loadConfig } = await import("../src/config.js");
+    const c = loadConfig({ TYPESAFE_API_KEY: "k", REASONING_BACKEND: "openrouter", OPENROUTER_API_KEY: "sk-test", TICK_MS: "10000" });
+    expect(c.jev.timeoutMs).toBe(8000);
+    const tight = loadConfig({ TYPESAFE_API_KEY: "k", REASONING_BACKEND: "openrouter", OPENROUTER_API_KEY: "sk-test", TICK_MS: "3000", OPENROUTER_TIMEOUT_MS: "2900" });
+    expect(tight.jev.timeoutMs).toBe(1000);
+  });
+});

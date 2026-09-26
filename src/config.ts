@@ -76,6 +76,8 @@ const EnvSchema = z.object({
   OPENROUTER_API_KEY: opt,
   OPENROUTER_MODEL: str("openai/gpt-4o-mini"),
   OPENROUTER_USD_PER_MTOK: num(0.15),
+  /** OpenRouter needs longer than Jev's 2s budget (measured ~1.7s for a trivial prompt). Must stay under TICK_MS. */
+  OPENROUTER_TIMEOUT_MS: num(8000),
   /** Cached-answer heartbeat: a real Jev call at least every N decide ticks per bee (default 12 ≈ 2 min at 10 s). */
   JEV_HEARTBEAT_TICKS: num(12),
   TICK_MS: num(10_000),
@@ -292,7 +294,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, settings: Setti
     jev: {
       apiKey: jevKey!,
       model: jevModel,
-      timeoutMs: e.JEV_TIMEOUT_MS,
+      timeoutMs: backend === "openrouter" ? Math.min(e.OPENROUTER_TIMEOUT_MS, Math.max(1000, e.TICK_MS - 2000)) : e.JEV_TIMEOUT_MS,
       dailyUsdCap: e.JEV_DAILY_USD_CAP,
       usdPerMTok: jevUsdPerMTok,
       heartbeatTicks: Math.max(1, Math.round(e.JEV_HEARTBEAT_TICKS)),
