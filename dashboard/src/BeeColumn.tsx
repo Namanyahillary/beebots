@@ -73,21 +73,51 @@ function EngineHelp({ styleId }: { styleId: string }) {
   if (styleId === "breezy")
     return (
       <Help title="Engine: Trend">
-        <p>The badge names the strategy this slot runs — trend following on BTC and ETH with a 9-slice Donchian ensemble on 4h bars — and describes capability, so it always shows, even before any data arrives.</p>
-        <p>Take-profit: at +1R the stop moves to breakeven (0.1R past fees), at +2R it trims half; a score decay of 3 also trims half.</p>
+        <p>This badge names the strategy this slot runs.</p>
+        <dl>
+          <dt>Universe</dt>
+          <dd>It follows trends on BTC and ETH with a 9 slice Donchian ensemble on 4 hour bars.</dd>
+          <dt>Presence</dt>
+          <dd>It describes capability so it always shows even before any data arrives.</dd>
+          <dt>Breakeven</dt>
+          <dd>At +1R the stop moves to breakeven past fees by 0.1R.</dd>
+          <dt>Trims</dt>
+          <dd>At +2R it trims half and a score decay of 3 also trims half.</dd>
+        </dl>
+        <p>Watch this when you compare what each slot is built to do.</p>
       </Help>
     );
   if (styleId === "boozy")
     return (
       <Help title="Engine: Momentum">
-        <p>The badge names the strategy this slot runs — momentum rotation into the week&apos;s hottest coin, pyramiding winners up to 2x — and describes capability, so it always shows, even before any data arrives.</p>
-        <p>Take-profit: at +1R the stop moves to breakeven (0.1R past fees) with no trim; rotation unlocks after 24 hours behind a 3× ATR(1h) trail.</p>
+        <p>This badge names the strategy this slot runs.</p>
+        <dl>
+          <dt>Universe</dt>
+          <dd>It rotates into the week hottest coin and pyramids winners up to 2x.</dd>
+          <dt>Presence</dt>
+          <dd>It describes capability so it always shows even before any data arrives.</dd>
+          <dt>Breakeven</dt>
+          <dd>At +1R the stop moves to breakeven past fees by 0.1R with no trim.</dd>
+          <dt>Rotation</dt>
+          <dd>Rotation unlocks after 24 hours behind a 3x ATR trail on 1 hour bars.</dd>
+        </dl>
+        <p>Watch this when you compare what each slot is built to do.</p>
       </Help>
     );
   return (
     <Help title="Engine: Breakout">
-      <p>The badge names the strategy this slot runs — one volatility breakout a day on BTC, ETH, SOL or HYPE — and describes capability, so it always shows, even before any data arrives.</p>
-      <p>Take-profit: at +1R the stop moves to breakeven (0.1R past fees) with no trim; the position rides to the UTC day close.</p>
+      <p>This badge names the strategy this slot runs.</p>
+      <dl>
+        <dt>Universe</dt>
+        <dd>It takes one volatility breakout a day on BTC, ETH, SOL or HYPE.</dd>
+        <dt>Presence</dt>
+        <dd>It describes capability so it always shows even before any data arrives.</dd>
+        <dt>Breakeven</dt>
+        <dd>At +1R the stop moves to breakeven past fees by 0.1R with no trim.</dd>
+        <dt>Close</dt>
+        <dd>The position rides to the UTC day close.</dd>
+      </dl>
+      <p>Watch this when you compare what each slot is built to do.</p>
     </Help>
   );
 }

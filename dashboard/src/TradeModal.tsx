@@ -20,7 +20,7 @@ function linkDecision(fill: FillEvent, decisions: DecisionEvent[]): { d: Decisio
 const money2 = (x: number) => `$${Math.abs(x).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 /** A fill plus the decision behind it: exact match on decisionId, else the nearest same-bee decision within 60s. */
-export function TradeModal({ fill, decisions, onClose }: { fill: FillEvent; decisions: DecisionEvent[]; onClose: () => void }) {
+export function TradeModal({ fill, decisions, leverage, onClose }: { fill: FillEvent; decisions: DecisionEvent[]; leverage?: { max: number; mode: string }; onClose: () => void }) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
     window.addEventListener("keydown", onKey);
@@ -63,6 +63,8 @@ export function TradeModal({ fill, decisions, onClose }: { fill: FillEvent; deci
           )}
           <dt>purpose</dt>
           <dd>{fill.purpose}</dd>
+          <dt>leverage</dt>
+          <dd>{leverage ? `${leverage.max}x ${leverage.mode} (account setting, every trade)` : "–"}</dd>
           <dt>time</dt>
           <dd>{new Date(fill.ts).toLocaleString()}</dd>
         </dl>

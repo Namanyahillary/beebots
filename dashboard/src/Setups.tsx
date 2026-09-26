@@ -41,8 +41,20 @@ export const Setups = memo(function Setups({ decisions }: { decisions: DecisionE
       <div className="rail-head">
         <span className="eyebrow">
           Setups <Help title="Setups">
-            <p>Each row counts one trigger label over the last {WINDOW} decisions: offered means it appeared in Jev&apos;s menu, picked means Jev chose it, with the last-seen age beside it. BREAKOUT_ is the Williams trigger (today&apos;s open plus half of yesterday&apos;s range); STINGER_ is the challenger (above the previous day&apos;s high with rising volume, volZ ≥ 1.0) — both are strict long opens, and fill labels record which one earned.</p>
-            <p>WAIT counts flat-and-waiting picks, HOLD counts keep-the-position picks. An empty panel means no triggers were offered in view, not that anything is broken: bizzy only asks Jev when a price is already through its trigger.</p>
+            <p>Setups shows Breakout triggers the wolf asked Jev about after price passed them.</p>
+            <dl>
+              <dt>Record</dt>
+              <dd>Each row counts how often a Jev menu trigger was offered and picked across the last 50 decisions with its last seen age.</dd>
+              <dt>Breakout</dt>
+              <dd>This Williams trigger fires at today open plus half of yesterday range as a strict long open.</dd>
+              <dt>Stinger</dt>
+              <dd>This challenger fires above the prior day high on rising volume with volZ at 1.0 or more as a strict long open.</dd>
+              <dt>Flat picks</dt>
+              <dd>Wait marks flat and waiting ticks and hold marks keep the position ticks.</dd>
+              <dt>Quiet panel</dt>
+              <dd>An empty panel means no triggers were offered, not that anything is broken.</dd>
+            </dl>
+            <p>Watch fill labels to see which trigger earned.</p>
           </Help>
         </span>
         <span className="num dim">last {n}</span>

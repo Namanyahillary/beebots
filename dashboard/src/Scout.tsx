@@ -29,7 +29,20 @@ export function Scout({ scout }: { scout: ScoutSnapshot | null | undefined }) {
       <section className="rail-card scout">
         <div className="rail-head">
           <span className="eyebrow">
-            Scout <Help title="Scout">Eligible coins passed every screen; excluded coins failed at least one, with the reason shown. The age is when the snapshot was stored. A new row is only written when the eligible set changes, and the panel never gates trading — each brain trades its own universe.</Help>
+            Scout <Help title="Scout">
+            <p>Scout records which coins passed the screens.</p>
+            <dl>
+              <dt>Eligible</dt>
+              <dd>These coins cleared spread gate, volume minimum, funding check and return rank and sort by 24 hour USD volume.</dd>
+              <dt>Excluded</dt>
+              <dd>These coins failed at least one screen and keep the reason beside them with only the top 10 by volume.</dd>
+              <dt>Age</dt>
+              <dd>The age marks when the snapshot was stored and a new row appears only when the eligible set changes.</dd>
+              <dt>Trading</dt>
+              <dd>Scout never gates trading and each wolf still trades its own universe.</dd>
+            </dl>
+            <p>Watch age because a coin seen 30 minutes ago may be gone.</p>
+          </Help>
           </span>
           <span className="num dim">no snapshot yet</span>
         </div>
@@ -41,8 +54,18 @@ export function Scout({ scout }: { scout: ScoutSnapshot | null | undefined }) {
       <div className="rail-head">
         <span className="eyebrow">
           Scout <Help title="Scout">
-            <p>Eligible coins passed all four screens — spread within the gate, 24h volume above the minimum, funding data present, and a 24h return to rank on — sorted by 24h USD volume. Excluded coins failed at least one screen, with the reason shown (only the top 10 by volume are kept).</p>
-            <p>The age shows when this snapshot was stored; a new row is only written when the eligible set changes, so staleness matters — an opportunity seen 30 minutes ago may be gone. The Scout never gates trading: each brain still trades its own universe.</p>
+            <p>Scout records which coins passed the screens.</p>
+            <dl>
+              <dt>Eligible</dt>
+              <dd>These coins cleared spread gate, volume minimum, funding check and return rank and sort by 24 hour USD volume.</dd>
+              <dt>Excluded</dt>
+              <dd>These coins failed at least one screen and keep the reason beside them with only the top 10 by volume.</dd>
+              <dt>Age</dt>
+              <dd>The age marks when the snapshot was stored and a new row appears only when the eligible set changes.</dd>
+              <dt>Trading</dt>
+              <dd>Scout never gates trading and each wolf still trades its own universe.</dd>
+            </dl>
+            <p>Watch age because a coin seen 30 minutes ago may be gone.</p>
           </Help>
         </span>
         <span className="num dim">{scoutAge(scout.ts, Date.now())}</span>

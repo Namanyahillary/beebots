@@ -70,6 +70,8 @@ export interface Snapshot {
   market: { refreshedAt: number; universe: string[]; spreadBlocked: Array<{ coin: string; spreadBp: number }>; attention: "news" | "volume" };
   /** Latest scout shortlist transition (log-only; nothing trades on it). Null until the first market refresh stores one. */
   scout: ScoutSnapshot | null;
+  /** Account leverage setting: one isolated-margin leverage for every trade. */
+  leverage: { max: number; mode: string };
   visitors?: { total: number; watching: number };
   /** Set when a newer GitHub Release exists than the version this install runs. */
   update?: { current: string; latest: string } | null;
@@ -163,9 +165,9 @@ export interface BeeMeta {
 
 /** Colours belong to the slot, so two bees on the same style still look different. Filled in from /profile at load. */
 export const BEE_META: Record<BeeName, BeeMeta> = {
-  bee1: { short: "Bizzy", tagline: "the grinder", styleLabel: "Breakout", rules: "", coins: [], img: "/bees/bizzy.jpg", color: "var(--bizzy)", glow: "var(--bizzy-glow)" },
-  bee2: { short: "Breezy", tagline: "the calculated one", styleLabel: "Trend", rules: "", coins: [], img: "/bees/breezy.jpg", color: "var(--breezy)", glow: "var(--breezy-glow)" },
-  bee3: { short: "Boozy", tagline: "the degen", styleLabel: "Momentum", rules: "", coins: [], img: "/bees/boozy.jpg", color: "var(--boozy)", glow: "var(--boozy-glow)" },
+  bee1: { short: "Blaze", tagline: "the grinder", styleLabel: "Breakout", rules: "", coins: [], img: "/bees/bizzy.jpg", color: "var(--bizzy)", glow: "var(--bizzy-glow)" },
+  bee2: { short: "Silver", tagline: "the calculated one", styleLabel: "Trend", rules: "", coins: [], img: "/bees/breezy.jpg", color: "var(--breezy)", glow: "var(--breezy-glow)" },
+  bee3: { short: "Grim", tagline: "the degen", styleLabel: "Momentum", rules: "", coins: [], img: "/bees/boozy.jpg", color: "var(--boozy)", glow: "var(--boozy-glow)" },
 };
 
 export interface Profile {

@@ -1,8 +1,8 @@
-// Single brand configuration for Wolfpack.
+// Single brand configuration for Wolfbots.
 // Every user-facing UI string, palette token, and mascot noun reads from here.
 
 export const BRAND = {
-  appName: "Wolfpack",
+  appName: "Wolfbots",
   tagline: "three AI wolves hunting live",
   extendedTagline: "Three AI wolves hunting live on OKX X-Perps",
   description:
@@ -90,9 +90,9 @@ export const BRAND = {
 
   setup: {
     steps: ["The rules", "Password", "Jev", "OpenAI", "Your wolves", "The Pack", "Start"] as const,
-    title: "Wolfpack setup",
+    title: "Wolfbots setup",
     rulesTitle: "Before anything else",
-    rulesIntro: "Wolfpack is an experiment and a piece of open-source software, not a trading product. Tick all three to carry on.",
+    rulesIntro: "Wolfbots is an experiment and a piece of open-source software, not a trading product. Tick all three to carry on.",
     notAdvice: "Nothing the wolves do, and nothing in the video or the code, is a recommendation to buy or sell anything.",
     paperDefault: "My wolves trade on paper. They use real market prices and simulated money. Nothing touches an exchange account unless I change the server settings myself, on purpose.",
     ownRisk: "I use it at my own risk. The software comes with no warranty (MIT licence). Leveraged crypto trading can lose everything you put in, and if I ever switch it to real money, that's on me.",

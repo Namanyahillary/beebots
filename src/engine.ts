@@ -1240,6 +1240,8 @@ export class Engine {
         spreadBlocked: view.spreadBlocked.map((i) => ({ coin: i.split("-")[0], spreadBp: Number((view.tickers.get(i)?.spreadBp ?? 0).toFixed(1)) })),
         attention: view.newsAvailable ? "news" : "volume",
       },
+      // Account leverage (one setting for every trade: isolated margin, capped at 2x).
+      leverage: { max: this.d.cfg.risk.maxLeverage, mode: "isolated" },
       // Latest scout shortlist transition (log-only visibility; nothing trades on it).
       scout: scoutLatest ? { ts: scoutLatest.ts, eligible: scoutLatest.eligible, excluded: scoutLatest.excluded } : null,
     };

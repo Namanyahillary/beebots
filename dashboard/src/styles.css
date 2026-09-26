@@ -1,4 +1,4 @@
-/* Wolfpack dashboard. Designed at 1920x1080 (1rem = 16px) and scaled with the viewport,
+/* Wolfbots dashboard. Designed at 1920x1080 (1rem = 16px) and scaled with the viewport,
    so a 3840x2160 capture is the same layout at 2x sharpness. */
 
 :root {
@@ -1728,6 +1728,23 @@ textarea.setup-input {
 }
 .help-body p:first-child {
   margin-top: 0;
+}
+.help-body dl {
+  margin: 0.6rem 0;
+}
+.help-body dt {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.help-body dd {
+  margin: 0.1rem 0 0.6rem;
+  color: var(--text-2);
+}
+.help-body dd:last-child {
+  margin-bottom: 0;
 }
 .engine-badges {
   display: flex;

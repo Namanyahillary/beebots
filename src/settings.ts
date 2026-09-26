@@ -13,24 +13,24 @@ export const STYLE_INFO: Record<StyleId, { label: string; blurb: string; name: s
   bizzy: {
     label: "Breakout",
     blurb: "One volatility breakout a day on BTC, ETH, SOL or HYPE, ridden to the daily close. Patient, then all in.",
-    name: "Bizzy",
+    name: "Blaze",
     tagline: "the grinder",
   },
   breezy: {
     label: "Trend",
     blurb: "Trend following on BTC and ETH only. Few trades, rides winners, sized by volatility. The calm one.",
-    name: "Breezy",
+    name: "Silver",
     tagline: "the calculated one",
   },
   boozy: {
     label: "Momentum",
     blurb: "Chases the strongest 7-day mover across every liquid coin, and adds to winners. Big swings, strange coins.",
-    name: "Boozy",
+    name: "Grim",
     tagline: "the degen",
   },
 };
 
-/** The original three are the official bees: owners' bees may not use their names ("Bizzy", "bizzy-bee", "Bizzie Bee"). */
+/** The original three are the official wolves: owners' wolves may not use their names ("Blaze", "blaze-wolf", "Blaze Wolf"). */
 const squash = (s: string) =>
   s
     .toLowerCase()

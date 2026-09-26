@@ -80,7 +80,18 @@ export function App() {
             <div className="rail-head">
               <span className="eyebrow">
                 Leaderboard <Help title="Leaderboard">
-                  This board ranks the three bees by current equity, widest bar wins. The public Hive board is separate and opt-in: paper trading only — a live-money engine can&apos;t join — and it shows % gain/loss only, never keys, account details or addresses. A verified badge means the server replayed that bee&apos;s fills against OKX candles and the books add up.
+                  <p>Leaderboard ranks the three wolves by current equity.</p>
+                  <dl>
+                    <dt>Local board</dt>
+                    <dd>The widest bar wins on this screen.</dd>
+                    <dt>Public board</dt>
+                    <dd>The public Hive board is separate and opt in for paper trading only so a live money engine cannot join.</dd>
+                    <dt>Privacy</dt>
+                    <dd>It shows % gain and loss only and never shows keys, account details or addresses.</dd>
+                    <dt>Verified</dt>
+                    <dd>A verified badge means the server replayed the wolf fills against OKX candles and the books add up.</dd>
+                  </dl>
+                  <p>Watch this when you want to see who leads the pack.</p>
                 </Help>
               </span>
               <span className="dim">equity</span>
@@ -102,7 +113,7 @@ export function App() {
             })}
           </section>
           <Ticker decisions={feed.decisions} perMin={feed.decisionTimes.length} />
-          <Fills fills={feed.fills} decisions={feed.decisions} />
+          <Fills fills={feed.fills} decisions={feed.decisions} leverage={feed.snap?.leverage} />
           <Scout scout={feed.snap?.scout} />
           <Setups decisions={feed.decisions} />
           {blocked.length > 0 && (

@@ -19,7 +19,7 @@ const FillRow = memo(function FillRow({ fill, onOpen }: { fill: FillEvent; onOpe
 });
 
 /** Recent fills, newest first. Clicking a row opens the trade (fill + linked decision). */
-export function Fills({ fills, decisions }: { fills: FillEvent[]; decisions: DecisionEvent[] }) {
+export function Fills({ fills, decisions, leverage }: { fills: FillEvent[]; decisions: DecisionEvent[]; leverage?: { max: number; mode: string } }) {
   const [sel, setSel] = useState<FillEvent | null>(null);
   const rows = fills ?? [];
   const history = decisions ?? [];
@@ -28,7 +28,16 @@ export function Fills({ fills, decisions }: { fills: FillEvent[]; decisions: Dec
       <div className="rail-head">
         <span className="eyebrow">
           Fills <Help title="Fills">
-            Recent fills, newest first — clicking a row opens the trade: the fill&apos;s price, size, fee and P&amp;L plus the decision behind it. The decision is linked by id when available, otherwise the nearest same-bee decision within 60 seconds. A fill with nothing nearby in the current view simply shows none in view.
+            <p>Recent fills show newest first.</p>
+            <dl>
+              <dt>Trade view</dt>
+              <dd>Each row opens the fill price, size, fee and profit and loss with the decision behind it.</dd>
+              <dt>Linked decision</dt>
+              <dd>The panel links by id when it can and otherwise uses the nearest same wolf decision within 60 seconds.</dd>
+              <dt>Empty match</dt>
+              <dd>A fill with nothing nearby in view shows none in view.</dd>
+            </dl>
+            <p>Watch this when you want to see why a trade happened.</p>
           </Help>
         </span>
         <span className="num dim">{rows.length > 0 ? `${rows.length} recent` : "none yet"}</span>
@@ -42,7 +51,7 @@ export function Fills({ fills, decisions }: { fills: FillEvent[]; decisions: Dec
       ) : (
         <div className="dim">no fills yet</div>
       )}
-      {sel && <TradeModal fill={sel} decisions={history} onClose={() => setSel(null)} />}
+      {sel && <TradeModal fill={sel} decisions={history} leverage={leverage} onClose={() => setSel(null)} />}
     </section>
   );
 }

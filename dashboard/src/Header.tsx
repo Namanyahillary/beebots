@@ -1,5 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { money, signed } from "./BeeColumn";
+import { BRAND } from "./brand";
 import { Help } from "./Help";
 import { HiveButton } from "./Hive";
 import { PROFILE, type Snapshot } from "./types";
@@ -53,7 +54,7 @@ export function Header({ snap, connected, stalled, soundOn, onSound }: { snap: S
     <header className="top">
       <div className="brand">
         <div className="brand-row">
-          <div className="logo">beebots</div>
+          <div className="logo">{BRAND.appName}</div>
           <HiveButton />
         </div>
         <div className="brand-sub">
@@ -64,7 +65,7 @@ export function Header({ snap, connected, stalled, soundOn, onSound }: { snap: S
             </a>
           ) : null}
           <span className="dim">
-            day {day} · 3 bees · OKX X-Perps · not financial advice
+            day {day} · 3 wolves · OKX X-Perps · not financial advice
           </span>
         </div>
       </div>
@@ -79,7 +80,20 @@ export function Header({ snap, connected, stalled, soundOn, onSound }: { snap: S
           sub={jev ? `today ${money(jev.spentTodayUsd, 3)} of ${money(jev.dailyCapUsd, 0)} cap` : undefined}
           help={
             <Help title="Jev calls">
-              Made counts real Jev API calls; skipped counts ticks where the cached answer was reused — same menu, market state, leader, position, cap and data freshness, within the heartbeat tick window — instead of paying for a new call. Saved is skipped × average call cost, an estimate of what the cache avoided. Only the API call is ever skipped: stops, caps, vetoes and take-profit still run in code every tick, and a spent daily cap or unreachable Jev means holding.
+              <p>Jev calls track what each decision cost.</p>
+              <dl>
+                <dt>Made</dt>
+                <dd>It counts real Jev API calls.</dd>
+                <dt>Skipped</dt>
+                <dd>It counts ticks where the cached answer was reused on the same menu, market, leader, position, cap and freshness within 12 heartbeat ticks.</dd>
+                <dt>Saved</dt>
+                <dd>It multiplies skipped calls by average call cost to estimate what the cache avoided.</dd>
+                <dt>Safety</dt>
+                <dd>Only the API call skips while stops, caps, vetoes and take profit still run in code every tick.</dd>
+                <dt>Holding</dt>
+                <dd>A spent daily cap or unreachable Jev means holding.</dd>
+              </dl>
+              <p>Watch this when daily spend climbs.</p>
             </Help>
           }
         />

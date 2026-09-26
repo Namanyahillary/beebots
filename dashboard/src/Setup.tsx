@@ -42,8 +42,8 @@ interface BeeDraft {
 }
 
 const EXAMPLES = [
-  "a Trump bee that only ever trades TRUMP",
-  "a sleepy bee that only buys bitcoin dips",
+  "a Trump wolf that only ever trades TRUMP",
+  "a sleepy wolf that only buys bitcoin dips",
   "a meme-coin gremlin that chases whatever is pumping",
 ];
 
@@ -60,10 +60,10 @@ const nameProblem = (name: string): string | null =>
   !/^[\p{L}\p{N} .'_-]{1,24}$/u.test(name.trim())
     ? "Names are 1-24 letters, numbers, spaces and . ' _ -"
     : RESERVED.has(squash(name))
-      ? "Bizzy, Breezy and Boozy are the official bees. Pick another name."
+      ? "Blaze, Silver and Grim are the official wolves. Pick another name."
       : null;
 
-const STEPS = ["The rules", "Password", "Jev", "OpenAI", "Your bees", "The Hive", "Start"] as const;
+const STEPS = ["The rules", "Password", "Jev", "OpenAI", "Your wolves", "The Hive", "Start"] as const;
 
 class TimedOut extends Error {}
 
@@ -219,7 +219,7 @@ export function Setup() {
     return (
       <div className="setup">
         <div className="setup-card center">
-          <h1>Starting your bees 🐝</h1>
+          <h1>Starting your wolves</h1>
           <p>Saved. The engine is restarting in paper trading. This page opens the dashboard as soon as it's back, usually within a minute.</p>
         </div>
       </div>
@@ -257,13 +257,13 @@ export function Setup() {
             <label className="setup-check">
               <input type="checkbox" checked={accept.notAdvice} onChange={(e) => setAccept({ ...accept, notAdvice: e.target.checked })} />
               <span>
-                <b>This is not financial advice.</b> Nothing the bees do, and nothing in the video or the code, is a recommendation to buy or sell anything.
+                <b>This is not financial advice.</b> Nothing the wolves do, and nothing in the video or the code, is a recommendation to buy or sell anything.
               </span>
             </label>
             <label className="setup-check">
               <input type="checkbox" checked={accept.paperDefault} onChange={(e) => setAccept({ ...accept, paperDefault: e.target.checked })} />
               <span>
-                <b>My bees trade on paper.</b> They use real market prices and simulated money. Nothing touches an exchange account unless I change the
+                <b>My wolves trade on paper.</b> They use real market prices and simulated money. Nothing touches an exchange account unless I change the
                 server settings myself, on purpose.
               </span>
             </label>
@@ -351,7 +351,7 @@ export function Setup() {
           <section>
             <h2>OpenAI key</h2>
             <p>
-              Required. OpenAI designs each bee's trading style from a sentence you write, and paints its portrait. A design is one quick, cheap
+              Required. OpenAI designs each wolf's trading style from a sentence you write, and paints its portrait. A design is one quick, cheap
               ChatGPT call; a portrait takes about 40 seconds and a few cents. The key is only used on this page.
             </p>
             {status.serverHasOpenAiKey ? (
@@ -386,10 +386,10 @@ export function Setup() {
 
         {step === 4 && (
           <section>
-            <h2>Design your bees</h2>
+            <h2>Design your wolves</h2>
             <p>
-              Three bees trade side by side and race each other. For each one, say how you want it to trade. OpenAI turns that into a name, a set of
-              rules and the coins it may trade, then you paint its portrait. Copied a winning bee's rules from{" "}
+              Three wolves trade side by side and race each other. For each one, say how you want it to trade. OpenAI turns that into a name, a set of
+              rules and the coins it may trade, then you paint its portrait. Copied a winning wolf's rules from{" "}
               <a href="https://beebots.tech" target="_blank" rel="noopener">
                 beebots.tech
               </a>
@@ -402,11 +402,11 @@ export function Setup() {
                 return (
                   <div className="setup-bee" key={i} style={{ ["--bee" as string]: `var(--${["bizzy", "breezy", "boozy"][i]})` }}>
                     <div className={`setup-portrait ${b.img ? "" : "empty"}`}>
-                      <img src={b.img ?? BEE_MARK_URL} alt={b.img ? `${d?.name ?? "bee"} portrait` : "no portrait yet"} />
+                      <img src={b.img ?? BEE_MARK_URL} alt={b.img ? `${d?.name ?? "wolf"} portrait` : "no portrait yet"} />
                       {b.busy === "paint" && <span className="setup-portrait-busy">Painting… (~40 s)</span>}
                     </div>
                     <label className="setup-label" htmlFor={`ask-${i}`}>
-                      How do you want this bee to trade?
+                      How do you want this wolf to trade?
                     </label>
                     <textarea
                       id={`ask-${i}`}
@@ -418,7 +418,7 @@ export function Setup() {
                       onChange={(e) => patch(i, { ask: e.target.value })}
                     />
                     <button className={d ? "ghost" : ""} disabled={!!b.busy || b.ask.trim().length < 3} onClick={() => void create(i)}>
-                      {b.busy === "design" ? "Designing…" : d ? "Create again" : "Create my bee"}
+                      {b.busy === "design" ? "Designing…" : d ? "Create again" : "Create my wolf"}
                     </button>
 
                     {d && (
@@ -432,7 +432,7 @@ export function Setup() {
                         </div>
                         <p className="setup-rules">{d.rules}</p>
                         <button className={b.img ? "ghost" : ""} disabled={!!b.busy} onClick={() => void paint(i)}>
-                          {b.busy === "paint" ? "Painting… (~40 s)" : b.img ? "Paint again" : "Generate your bee's portrait"}
+                          {b.busy === "paint" ? "Painting… (~40 s)" : b.img ? "Paint again" : "Generate your wolf's portrait"}
                         </button>
                       </div>
                     )}
@@ -442,7 +442,7 @@ export function Setup() {
               })}
             </div>
             <div className="setup-actions">
-              {!beesReady && <span className="dim small setup-hint">Create all three bees and paint their portraits to carry on.</span>}
+              {!beesReady && <span className="dim small setup-hint">Create all three wolves and paint their portraits to carry on.</span>}
               <button className="ghost" onClick={() => setStep(3)}>
                 Back
               </button>
@@ -457,11 +457,11 @@ export function Setup() {
           <section>
             <h2>Join the Hive?</h2>
             <p>
-              The Hive is a public leaderboard of everyone's bees at{" "}
+              The Hive is a public leaderboard of everyone's wolves at{" "}
               <a href="https://beebots.tech" target="_blank" rel="noopener">
                 beebots.tech
               </a>
-              . Your bees race everyone else's, and each fill is checked against OKX's public prices.
+              . Your wolves race everyone else's, and each fill is checked against OKX's public prices.
             </p>
             <div className="setup-hive">{HIVE_DISCLAIMER}</div>
             <div className="setup-actions">
@@ -492,13 +492,13 @@ export function Setup() {
               ))}
             </ul>
             <p>
-              Each bee starts with <b>$333 of paper money</b>, and trades OKX perpetuals at real prices. The engine saves your settings, restarts, and opens
+              Each wolf starts with <b>$333 of paper money</b>, and trades OKX perpetuals at real prices. The engine saves your settings, restarts, and opens
               the live dashboard. The setup page then closes for good. To run it again later, see the README.
             </p>
             <p>
               {hive
-                ? "Your bees join the Hive when the engine starts. You can leave any time from the dashboard."
-                : "Your bees stay off the Hive. You can join later from the dashboard."}
+                ? "Your wolves join the Hive when the engine starts. You can leave any time from the dashboard."
+                : "Your wolves stay off the Hive. You can join later from the dashboard."}
             </p>
             <div className="setup-actions">
               <button className="ghost" onClick={() => setStep(5)}>
