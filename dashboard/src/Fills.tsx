@@ -20,22 +20,24 @@ const FillRow = memo(function FillRow({ fill, onOpen }: { fill: FillEvent; onOpe
 /** Recent fills, newest first. Clicking a row opens the trade (fill + linked decision). */
 export function Fills({ fills, decisions }: { fills: FillEvent[]; decisions: DecisionEvent[] }) {
   const [sel, setSel] = useState<FillEvent | null>(null);
+  const rows = fills ?? [];
+  const history = decisions ?? [];
   return (
     <section className="rail-card fills">
       <div className="rail-head">
         <span className="eyebrow">Fills</span>
-        <span className="num dim">{fills.length > 0 ? `${fills.length} recent` : "none yet"}</span>
+        <span className="num dim">{rows.length > 0 ? `${rows.length} recent` : "none yet"}</span>
       </div>
-      {fills.length > 0 ? (
+      {rows.length > 0 ? (
         <div className="fills-list">
-          {fills.map((f) => (
+          {rows.map((f) => (
             <FillRow key={`${f.ts}-${f.bee}-${f.coin}-${f.contracts}-${f.px}`} fill={f} onOpen={() => setSel(f)} />
           ))}
         </div>
       ) : (
         <div className="dim">no fills yet</div>
       )}
-      {sel && <TradeModal fill={sel} decisions={decisions} onClose={() => setSel(null)} />}
+      {sel && <TradeModal fill={sel} decisions={history} onClose={() => setSel(null)} />}
     </section>
   );
 }

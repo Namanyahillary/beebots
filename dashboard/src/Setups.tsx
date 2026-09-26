@@ -15,7 +15,7 @@ interface SetupRow {
 /** Where Stinger is working: trigger labels offered to Jev recently, how often each won, and when each was last seen. */
 export const Setups = memo(function Setups({ decisions }: { decisions: DecisionEvent[] }) {
   const { rows, waits, holds, n } = useMemo(() => {
-    const view = decisions.slice(0, WINDOW);
+    const view = (decisions ?? []).slice(0, WINDOW);
     const byLabel = new Map<string, SetupRow>();
     let waits = 0;
     let holds = 0;
