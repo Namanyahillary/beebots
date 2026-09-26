@@ -20,6 +20,11 @@ export const BOOZY_MIN_HOLD_MIN = 24 * 60;
 /** Enter at 1x equity (half of the 2x max), pyramid +0.5x per +1 ATR(1h) in profit, up to 2x. */
 const ENTRY_FRAC = 0.5;
 const ADD_FRAC = 0.25;
+/** Profit mode: one full stop may cost at most this fraction of equity. Sizes entries
+ *  from stop distance instead of a fixed fraction (AERO at 7.2% stop used to risk
+ *  7.4% of equity; now it would open ~$70, not ~$331). Pyramid adds keep ADD_FRAC
+ *  (follow-up: cap total pyramid risk the same way). */
+const RISK_PCT_EQUITY = 0.015;
 /** 1h ATR is approximated as 2 x the 15m ATR (sqrt of 4 bars); trail at 3 x ATR(1h). */
 const atr1hPx = (s: CoinStats | undefined) => (s && s.atr14Pct !== null ? (s.mid * s.atr14Pct * 2) / 100 : null);
 const TRAIL_ATR1H = 3;
@@ -138,7 +143,23 @@ export const boozy: BeeBrain = {
     return "required by the rules";
   },
 
-  sizeFrac(intent) {
+  sizeFrac(intent, _conviction, ctx) {
+    // Risk-normalized entries (adds keep ADD_FRAC): notional = budget / stop
+    // distance, so a stopped-out entry costs ~RISK_PCT_EQUITY whatever the coin's
+    // volatility. Falls back to the fixed fraction when no stop is computable.
+    if (intent.kind === "open" || intent.kind === "switch") {
+      const s = ctx.view.stats.get(intent.instId);
+      const atr = atr1hPx(s);
+      const mid = s?.mid ?? 0;
+      if (s && atr !== null && mid > 0) {
+        const stop = intent.side === "long" ? mid - TRAIL_ATR1H * atr : mid + TRAIL_ATR1H * atr;
+        const distFrac = Math.abs(mid - stop) / mid;
+        const max = maxNotionalUsd(ctx);
+        if (distFrac > 0 && max > 0) {
+          return Math.max(0, Math.min(1, (RISK_PCT_EQUITY * ctx.bee.equityUsd) / (distFrac * max)));
+        }
+      }
+    }
     // Always enter at 1x; size comes from pyramiding into winners, not from conviction.
     return intent.sizeFrac;
   },

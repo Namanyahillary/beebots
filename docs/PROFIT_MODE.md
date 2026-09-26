@@ -139,3 +139,13 @@ as with direct JEV. Per-decision `r.model` records the responding model
 Conviction is now JEV-calibrated, so conviction-gate validation can proceed on
 real semantics. Cost note: cap mechanics reused unchanged
 (`OPENROUTER_USD_PER_MTOK`, default 0.042).
+
+## Risk-normalized boozy entries (shipped)
+Ledger showed a $24 risk (7.4% equity) on a $325 account vs 8% daily stop: fixed-fraction
+sizing × wide ATR trails = random risk per trade. Entries now size as
+notional = 1.5% × equity / stop-distance, clamped to max, falling back to the fixed
+fraction when no stop is computable. Pyramid adds keep their fixed fraction (follow-up:
+cap total pyramid risk the same way; mitigated meanwhile because adds happen into
+winners, usually behind a breakeven stop). Fee drag on tiny notionals is the watch
+item, measured not gated. TP/BE triggers gain meaning automatically: riskUsd now
+approximates the budget by construction.

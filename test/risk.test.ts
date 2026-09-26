@@ -254,14 +254,15 @@ describe("boozy: always holding something", () => {
     expect(r.action.kind).toBe("open");
   });
 
-  it("the forced ape is 1x equity (half of max)", () => {
+  it("the forced ape is risk-normalized (1.5% stop risk), not 1x equity", () => {
     const r = run(ctx("boozy", bee("boozy", { flatSince: NOW - 2000 }), V), boozy, null, "no_options");
-    expect((r.action as { notionalUsd: number }).notionalUsd).toBeCloseTo(0.5 * 666, 5);
+    // SOL fixture: 3% stop distance → 0.015*333/(0.03*666) = 0.25 of $666 max.
+    expect((r.action as { notionalUsd: number }).notionalUsd).toBeCloseTo(166.5, 5);
   });
 
-  it("always enters at 1x whatever the conviction; size comes from pyramiding", () => {
-    expect(run(ctx("boozy", bee("boozy"), V), boozy, prop(open(SOL.instId, "long", "strict", 0.5), 0.5, 3)).action).toMatchObject({ notionalUsd: 333 });
-    expect(run(ctx("boozy", bee("boozy"), V), boozy, prop(open(SOL.instId, "long", "strict", 0.5), 0.5, 0)).action).toMatchObject({ notionalUsd: 333 });
+  it("entry size follows stop distance, not conviction; pyramiding still adds fixed slices", () => {
+    expect(run(ctx("boozy", bee("boozy"), V), boozy, prop(open(SOL.instId, "long", "strict", 0.5), 0.5, 3)).action).toMatchObject({ notionalUsd: 166.5 });
+    expect(run(ctx("boozy", bee("boozy"), V), boozy, prop(open(SOL.instId, "long", "strict", 0.5), 0.5, 0)).action).toMatchObject({ notionalUsd: 166.5 });
   });
 });
 
@@ -289,7 +290,10 @@ describe("no hold while flat, and menu sanity", () => {
 describe("size cap: 2x and the absolute ceiling", () => {
   it("never exceeds MAX_LEVERAGE x equity", () => {
     const r = run(ctx("boozy", bee("boozy", { equityUsd: 200, dayStartEquityUsd: 200 }), V), boozy, prop(open(SOL.instId), 0.9, 3));
-    expect((r.action as { notionalUsd: number }).notionalUsd).toBe(400);
+    const n = (r.action as { notionalUsd: number }).notionalUsd;
+    expect(n).toBeLessThanOrEqual(400);
+    // Risk-sized well under the cap: 0.015*200/(0.03*400) = 0.25 → $100.
+    expect(n).toBeCloseTo(100, 5);
   });
 
   it("never exceeds MAX_NOTIONAL_USD_PER_BEE even with a big (demo) balance", () => {
@@ -303,7 +307,7 @@ describe("size cap: 2x and the absolute ceiling", () => {
 
   it("the live ramp shrinks size", () => {
     const r = run(ctx("boozy", bee("boozy"), V), boozy, prop(open(SOL.instId), 0.9, 3), "ok", { sizeMult: 0.25 });
-    expect((r.action as { notionalUsd: number }).notionalUsd).toBeCloseTo(166.5, 5);
+    expect((r.action as { notionalUsd: number }).notionalUsd).toBeCloseTo(41.625, 5);
   });
 
   it("double-down is capped at the room left under max", () => {

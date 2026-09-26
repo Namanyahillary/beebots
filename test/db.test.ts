@@ -56,7 +56,7 @@ describe("decisions.model attribution", () => {
   it("records the reasoning model per decision", async () => {
     const { Db } = await import("../src/db.js");
     const db = new Db(":memory:");
-    const base = { bee: "bee1", ts: 1, stateHash: null, stateJson: null, menuJson: "[]", choice: "RIDE", probabilities: null, confidence: null, conviction: null, latencyMs: null, inputTokens: null, jevCostUsd: 0, jevError: null, action: { kind: "none" }, vetoedBy: null, forcedBy: null, status: "x" };
+    const base = { bee: "bee1" as const, ts: 1, stateHash: null, stateJson: null, menuJson: "[]", choice: "RIDE", probabilities: null, confidence: null, conviction: null, latencyMs: null, inputTokens: null, jevCostUsd: 0, jevError: null, action: { kind: "none" }, vetoedBy: null, forcedBy: null, status: "x" };
     db.insertDecision({ ...base, model: "openai/gpt-4o-mini" });
     db.insertDecision({ ...base, ts: 2, model: null });
     const rows = db.raw.prepare(`SELECT model FROM decisions ORDER BY ts`).all() as Array<{ model: string | null }>;

@@ -214,7 +214,7 @@ export function applyProfile(p: Profile): void {
 
 /** Shown on Setup and in the dashboard's Hive dialog. */
 export const HIVE_DISCLAIMER =
-  "You're about to share your bees' names, styles and paper-trading results on the public leaderboard at beebots.tech. The board shows % gain/loss only. No keys, no exchange account details, no IP address. Paper trading only. Not financial advice. You can leave any time.";
+  "You're about to share your wolves' names, styles and paper-trading results on the public leaderboard at beebots.tech. The board shows % gain/loss only. No keys, no exchange account details, no IP address. Paper trading only. Not financial advice. You can leave any time.";
 
 /** The engine's GET /hive/status. No hive id, no key. */
 export interface HiveStatus {

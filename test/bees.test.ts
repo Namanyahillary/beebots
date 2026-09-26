@@ -231,3 +231,29 @@ describe("breezy neverForce (profit mode: no forced entries)", () => {
     expect(breezy.idleStatus!(ctx("breezy", bee("breezy"), v))).toContain("BTC");
   });
 });
+
+describe("boozy risk-normalized entries (1.5% risk per stopped-out entry)", () => {
+  const cfg = testConfig();
+  const mk = (mid: number, atrPct: number, equity = 333) => {
+    const s = coin("DOGE", { atr14Pct: atrPct }, mid);
+    const v = view([s]);
+    const c = ctx("boozy", bee("boozy", { equityUsd: equity }), v, cfg, NOW);
+    return { s, v, c };
+  };
+  const open = { kind: "open" as const, instId: "", side: "long" as const, sizeFrac: 0.5, setup: "strict" as const };
+  it("wide stop shrinks the entry (AERO case: 7.2% stop on $333)", () => {
+    // atr14Pct 1.2 → atr1h 2.4% → 3x trail = 7.2% stop; max = min(2*333, 700) = 666.
+    const { c, s } = mk(1, 1.2);
+    const f = boozy.sizeFrac({ ...open, instId: s.instId }, 3, c);
+    expect(f).toBeCloseTo((0.015 * 333) / (0.072 * 666), 3);
+    expect(f).toBeLessThan(0.5);
+  });
+  it("narrow stop caps at full size, unknown stop passes through", () => {
+    const narrow = mk(100, 0.1);
+    expect(boozy.sizeFrac({ ...open, instId: narrow.s.instId }, 3, narrow.c)).toBe(1);
+    const noAtr = coin("DOGE", { atr14Pct: null }, 1);
+    const v = view([noAtr]);
+    const c = ctx("boozy", bee("boozy"), v, cfg, NOW);
+    expect(boozy.sizeFrac({ ...open, instId: noAtr.instId }, 3, c)).toBe(0.5);
+  });
+});

@@ -56,7 +56,7 @@ function HiveDialog({ status, onClose, onStatus }: { status: HiveStatus; onClose
         <button className="modal-x" onClick={onClose} aria-label="Close">
           ×
         </button>
-        <h2 id="hive-title">{status.joined ? "In the Hive ✓" : "Join the Hive"}</h2>
+        <h2 id="hive-title">{status.joined ? "In the Pack ✓" : "Join the Pack"}</h2>
         <p className="modal-disclaimer">{HIVE_DISCLAIMER}</p>
 
         {status.joined && (
@@ -77,7 +77,7 @@ function HiveDialog({ status, onClose, onStatus }: { status: HiveStatus; onClose
         )}
 
         {!status.paper && !status.joined ? (
-          <p className="bad">The Hive is for paper trading only. This engine runs with real money, so it can't join.</p>
+          <p className="bad">The Pack board is for paper trading only. This engine runs with real money, so it can't join.</p>
         ) : !status.passwordSet ? (
           <p className="bad">
             This server has no owner password yet. Run Setup again to pick one (see the README), or set <code>OWNER_PASSWORD</code> and restart the
@@ -108,7 +108,7 @@ function HiveDialog({ status, onClose, onStatus }: { status: HiveStatus; onClose
 
         <div className="modal-actions">
           <a href={board} target="_blank" rel="noopener">
-            See the hive on {boardHost(board)} ↗
+            See the pack board on {boardHost(board)} ↗
           </a>
           {status.joined ? (
             <button className="danger" disabled={busy || !passwordOk || !status.passwordSet} onClick={() => void act("leave")}>
@@ -148,7 +148,7 @@ export function HiveButton() {
   return (
     <>
       <button className={`hive-btn ${status.joined ? "in" : ""}`} onClick={() => setOpen(true)}>
-        {status.joined ? "In the Hive ✓" : "🐝 Join the Hive"}
+        {status.joined ? "In the Pack ✓" : "🐺 Join the Pack"}
       </button>
       {open && <HiveDialog status={status} onClose={() => setOpen(false)} onStatus={setStatus} />}
     </>
