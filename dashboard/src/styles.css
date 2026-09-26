@@ -784,6 +784,9 @@ body,
   margin-bottom: 0.6rem;
   font-size: 0.8rem;
 }
+.rail-card.collapsed .rail-head {
+  margin-bottom: 0;
+}
 .board-row {
   display: grid;
   grid-template-columns: 1.2rem 2rem 4.2rem 1fr 6.2rem;
@@ -827,6 +830,9 @@ body,
   min-height: 0;
   display: flex;
   flex-direction: column;
+}
+.ticker.collapsed {
+  flex: none;
 }
 .ticks {
   list-style: none;
@@ -955,6 +961,26 @@ body,
   flex-direction: column;
   gap: 0.65rem;
   margin-top: 0.4rem;
+  max-height: 19rem;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  padding-right: 0.35rem;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line) transparent;
+}
+.scout-log-rows::-webkit-scrollbar {
+  width: 4px;
+}
+.scout-log-rows::-webkit-scrollbar-track {
+  background: transparent;
+}
+.scout-log-rows::-webkit-scrollbar-thumb {
+  background: var(--line);
+  border-radius: 4px;
+}
+.scout-log-rows::-webkit-scrollbar-thumb:hover {
+  background: var(--muted);
 }
 .scout-log-row {
   border-bottom: 1px solid var(--line);
@@ -1489,6 +1515,10 @@ body,
     order: 0;
     /* take the height of the bee beside it instead of growing with the (unbounded) stream */
     contain: size;
+  }
+  .ticker.collapsed {
+    contain: none;
+    flex: none;
   }
   .ticks {
     max-height: none;
