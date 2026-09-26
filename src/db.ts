@@ -257,8 +257,16 @@ export class Db {
   }
 
   recentEvents(n: number): string[] {
-    const rows = this.raw.prepare(`SELECT json FROM (SELECT id, json FROM events ORDER BY id DESC LIMIT ?) ORDER BY id ASC`).all(n) as Array<{ json: string }>;
-    return rows.map((r) => r.json);
+    // Decision ticks flood the table: reserve room so fills/caps/funding are never
+    // pushed out of the window (Fills card showed "none yet" with fills in the DB).
+    type Row = { id: number; json: string };
+    const dec = this.raw
+      .prepare(`SELECT id, json FROM events WHERE type = 'decision' ORDER BY id DESC LIMIT ?`)
+      .all(n) as Row[];
+    const rest = this.raw
+      .prepare(`SELECT id, json FROM events WHERE type != 'decision' ORDER BY id DESC LIMIT 50`)
+      .all() as Row[];
+    return [...dec, ...rest].sort((a, b) => a.id - b.id).map((r) => r.json);
   }
 
   pruneEvents(olderThanTs: number): void {

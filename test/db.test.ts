@@ -39,3 +39,15 @@ describe("bee_state position migration", () => {
     db.close();
   });
 });
+
+describe("recentEvents reserves room for non-decision events", () => {
+  it("fills survive a flood of decision ticks", async () => {
+    const { Db } = await import("../src/db.js");
+    const db = new Db(":memory:");
+    for (let i = 0; i < 410; i++) db.insertEvent(i, "decision", `{"type":"decision","i":${i}}`);
+    db.insertEvent(411, "fill", `{"type":"fill","coin":"BTC"}`);
+    const rows = db.recentEvents(400);
+    expect(rows.length).toBeLessThanOrEqual(450);
+    expect(rows.some((j) => j.includes('"fill"'))).toBe(true);
+  });
+});

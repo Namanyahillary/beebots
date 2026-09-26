@@ -23,10 +23,10 @@ function Delta({ usd, pct }: { usd: number; pct?: number }) {
   );
 }
 
-function Meter({ label, value, max, text }: { label: string; value: number; max: number; text: string }) {
+function Meter({ label, value, max, text, title }: { label: string; value: number; max: number; text: string; title?: string }) {
   const frac = Math.max(0, Math.min(1, max > 0 ? value / max : 0));
   return (
-    <div className="meter">
+    <div className="meter" title={title}>
       <div className="meter-head">
         <span>{label}</span>
         <span className="num">{text}</span>
@@ -223,7 +223,7 @@ export function BeeColumn({ name, bee, curve, baseline, rank, gap, flash, fills,
 
       <div className="meters">
         <button type="button" className="trades-btn" onClick={() => { setSel(null); setShowFills(true); }} title={`${meta.short} fills`}>
-          <Meter label="Trades today" value={bee?.tradesToday ?? 0} max={bee?.maxTradesPerDay ?? 1} text={`${bee?.tradesToday ?? 0} / ${bee?.maxTradesPerDay ?? "–"}`} />
+          <Meter label="Entries today" value={bee?.tradesToday ?? 0} max={bee?.maxTradesPerDay ?? 1} text={`${bee?.tradesToday ?? 0} / ${bee?.maxTradesPerDay ?? "–"}`} title="Entries opened today (not closed trades)" />
         </button>
         <Meter label="Fee budget" value={bee?.feesTodayUsd ?? 0} max={bee?.feeBudgetUsd ?? 1} text={`${money(bee?.feesTodayUsd ?? 0)} / ${money(bee?.feeBudgetUsd ?? 0)}`} />
       </div>
