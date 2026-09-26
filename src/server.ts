@@ -1,4 +1,4 @@
-// Read-only HTTP: GET /events (SSE), /snapshot, /history?n=, /equity?days=, /visit, /health, /profile, /bee-image/<bee>.
+// Read-only HTTP: GET /events (SSE), /snapshot, /history?n=, /scout/history?n=, /equity?days=, /visit, /health, /profile, /bee-image/<bee>.
 // Never config or keys. The exceptions: /setup/*, which only exists before first-run Setup is done (setup.ts), and
 // POST /hive/join and /hive/leave, which need the owner password (gate.ts, hive.ts). GET /hive/status is public and holds no key.
 // /visit is the page's hit counter: it bumps a total and returns it (see visitors.ts; no IP is stored or logged).
@@ -111,6 +111,10 @@ export function startServer(deps: ServerDeps, port: number, bind: string): Serve
         const body = hit.body;
         res.writeHead(200, { "content-type": "application/json", "cache-control": "no-store", "access-control-allow-origin": "*" });
         return res.end(body);
+      }
+      case "/scout/history": {
+        const n = Math.max(1, Math.min(50, Number(url.searchParams.get("n") ?? 20) || 20));
+        return json(res, 200, e.db.scoutHistory(n));
       }
       case "/events": {
         const addr = clientAddr(req.headers["x-forwarded-for"], req.socket.remoteAddress);

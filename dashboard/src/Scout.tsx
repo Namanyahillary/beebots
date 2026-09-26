@@ -1,9 +1,14 @@
 import { memo } from "react";
 import { useCollapsed } from "./collapse";
 import { Help } from "./Help";
-import type { ScoutSnapshot } from "./types";
+import type { ScoutEligibleEntry, ScoutSnapshot } from "./types";
 
 const coinOf = (instId: string) => instId.split("-")[0];
+
+/** instId of an eligible entry, whether legacy plain string or enriched object. */
+export function scoutEligibleId(e: string | ScoutEligibleEntry): string {
+  return typeof e === "string" ? e : e.instId;
+}
 
 /** Snapshot age: staleness IS the point — an opportunity seen 30m ago may be gone. */
 export function scoutAge(ts: number, now: number): string {
@@ -78,9 +83,10 @@ export function Scout({ scout }: { scout: ScoutSnapshot | null | undefined }) {
       <>
       {scout.eligible.length > 0 ? (
         <div className="blocked-list num">
-          {scout.eligible.map((id) => (
-            <span key={id}>{coinOf(id)}</span>
-          ))}
+          {scout.eligible.map((e) => {
+            const id = scoutEligibleId(e);
+            return <span key={id}>{coinOf(id)}</span>;
+          })}
         </div>
       ) : (
         <div className="dim">nothing passing the screen</div>

@@ -19,7 +19,7 @@ describe("scout snapshots (insert-on-change only)", () => {
     // A membership change stores a new row.
     expect(storeScoutIfChanged(db, NOW + 3, [SOL, BTC], [])).toBe(true);
     expect(db.raw.prepare(`SELECT COUNT(*) AS n FROM scout_snapshots`).get()).toMatchObject({ n: 2 });
-    expect(db.latestScoutSnapshot()).toMatchObject({ ts: NOW + 3, eligible: [SOL, BTC] });
+    expect(db.latestScoutSnapshot()).toMatchObject({ ts: NOW + 3, eligible: [{ instId: SOL }, { instId: BTC }] });
     // Scout path wrote nowhere else.
     for (const t of ["orders", "fills", "decisions", "ghost_decisions"]) {
       const n = db.raw.prepare(`SELECT COUNT(*) AS n FROM ${t}`).get() as { n: number };
@@ -34,7 +34,7 @@ describe("scout snapshots (insert-on-change only)", () => {
     db.insertScoutSnapshot({ ts: NOW, eligible: [BTC], excluded: [] });
     db.pruneScoutSnapshots(NOW - 5);
     expect(db.raw.prepare(`SELECT COUNT(*) AS n FROM scout_snapshots`).get()).toMatchObject({ n: 1 });
-    expect(db.latestScoutSnapshot()).toMatchObject({ ts: NOW, eligible: [BTC] });
+    expect(db.latestScoutSnapshot()).toMatchObject({ ts: NOW, eligible: [{ instId: BTC }] });
     db.close();
   });
 

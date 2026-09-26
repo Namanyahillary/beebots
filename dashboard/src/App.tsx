@@ -4,6 +4,7 @@ import { Fills } from "./Fills";
 import { Header } from "./Header";
 import { Help } from "./Help";
 import { Scout } from "./Scout";
+import { ScoutLog } from "./ScoutLog";
 import { Setups } from "./Setups";
 import { unlockAudio } from "./sound";
 import { Ticker } from "./Ticker";
@@ -123,6 +124,7 @@ export function App() {
           <Ticker decisions={feed.decisions} perMin={feed.decisionTimes.length} />
           <Fills fills={feed.fills} decisions={feed.decisions} leverage={feed.snap?.leverage} />
           <Scout scout={feed.snap?.scout} />
+          <ScoutLog />
           <Setups decisions={feed.decisions} />
           {blocked.length > 0 && (
             <section className={`rail-card blocked${blockedCollapsed ? " collapsed" : ""}`}>

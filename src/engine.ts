@@ -16,7 +16,7 @@ import type { MarketView } from "./market/types.js";
 import { createHash } from "node:crypto";
 import { safeError } from "./redact.js";
 import { applyRisk, takeProfitSignal, type JevStatus, type Proposal } from "./risk.js";
-import { eligibleSetEqual, sampleExcluded, screenUniverse } from "./scout.js";
+import { eligibleSetEqual, enrichEligible, sampleExcluded, screenUniverse, type ScoutEligibleEntry } from "./scout.js";
 import { buildSnapshot } from "./snapshot.js";
 
 const FUNDING_HOURS_UTC = [0, 8, 16];
@@ -182,18 +182,25 @@ export function ghostPick(brain: BeeBrain, ctx: BeeContext, menu: Menu): { choic
 /**
  * Scout snapshot writer (LOG-ONLY): stores the shortlist only when the eligible
  * set changed since the last stored snapshot, so the log shows transitions
- * instead of one row per refresh. Never gates trading — the caller keeps
- * trading the brains' own universes. Returns true when a row was stored.
+ * instead of one row per refresh. Comparison is on the instId SET only —
+ * enrichment wiggles (trigger proximity, trend sign) alone never store a row.
+ * Never gates trading — the caller keeps trading the brains' own universes.
+ * Returns true when a row was stored.
  */
 export function storeScoutIfChanged(
   db: Db,
   ts: number,
-  eligible: string[],
+  eligible: Array<string | ScoutEligibleEntry>,
   excluded: Array<{ instId: string; reasons: string[] }>,
 ): boolean {
   const prev = db.latestScoutSnapshot();
   if (prev && eligibleSetEqual(prev.eligible, eligible)) return false;
-  db.insertScoutSnapshot({ ts, eligible, excluded });
+  const toStore: ScoutEligibleEntry[] = eligible.map((e) =>
+    typeof e === "string"
+      ? { instId: e, toTriggerPct: null, trendSign: null }
+      : { instId: e.instId, toTriggerPct: e.toTriggerPct ?? null, trendSign: e.trendSign ?? null },
+  );
+  db.insertScoutSnapshot({ ts, eligible: toStore, excluded });
   return true;
 }
 
@@ -372,6 +379,9 @@ export class Engine {
    * Scout visibility (LOG-ONLY, never gates trading): after each market refresh,
    * screen the universe and store a snapshot only when the eligible set changed
    * (opportunities decay — the log shows transitions, not every refresh).
+   * Each eligible instId is enriched with direction context from the live view
+   * (trigger proximity pct + trend score sign) for the history log; the
+   * store-on-change gate still compares instId sets only.
    * Excluded reasons are sampled to the top ~10 by volume to bound row size.
    * Failures are contained so the screen can never break a market refresh.
    */
@@ -382,8 +392,9 @@ export class Engine {
         spreadGateBps: Math.max(...STYLES.map((s) => this.d.cfg.bees[s].spreadGateBps)),
         min24hVolUsd: this.d.cfg.universe.min24hVolUsd,
       });
+      const enriched = enrichEligible(r.eligible, view);
       const excluded = sampleExcluded(r.excluded, (id) => view.stats.get(id)?.vol24hUsd ?? 0);
-      if (storeScoutIfChanged(this.d.db, now, r.eligible, excluded)) {
+      if (storeScoutIfChanged(this.d.db, now, enriched, excluded)) {
         log.info("scout transition", { eligible: r.eligible, excluded: excluded.length });
       }
     } catch (err) {

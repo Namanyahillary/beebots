@@ -20,6 +20,20 @@ export interface ScoutExclusion {
   reasons: string[];
 }
 
+/**
+ * Direction context stored alongside each eligible instId (LOG-ONLY screening
+ * context, never a trade recommendation): how far the price is from the live
+ * breakout trigger and the sign of the trend score, where that data exists.
+ * Nulls mean "no data" (coin without breakout/trend coverage).
+ */
+export interface ScoutEligibleEntry {
+  instId: string;
+  /** (trigger-mid)/mid*100; negative = already through the trigger. Null when no breakout data. */
+  toTriggerPct: number | null;
+  /** Sign of trend.score (-1|0|1). Null when no trend data. */
+  trendSign: -1 | 0 | 1 | null;
+}
+
 export interface ScoutResult {
   /** Passed every screen, sorted by 24h USD volume descending (mirrors the gated ranking). */
   eligible: string[];
@@ -30,14 +44,56 @@ export interface ScoutResult {
 /** Max excluded entries stored per snapshot: bounds row size while keeping the why-not visible. */
 export const SCOUT_EXCLUDED_SAMPLE = 10;
 
+/** instIds of an eligible list, whether legacy plain strings or enriched entries. */
+export function eligibleIds(list: Array<string | { instId: string }>): string[] {
+  return list.map((e) => (typeof e === "string" ? e : e.instId));
+}
+
 /**
  * Order-insensitive eligible-set equality: a volume-rank flip that changes the
- * order but not the membership is not a transition worth logging.
+ * order but not the membership is not a transition worth logging. Compares
+ * instId SETS only — enrichment wiggles (proximity pct, trend sign) alone are
+ * never a transition. Accepts legacy string lists and enriched entries.
  */
-export function eligibleSetEqual(a: string[], b: string[]): boolean {
-  if (a.length !== b.length) return false;
-  const set = new Set(a);
-  return b.every((x) => set.has(x));
+export function eligibleSetEqual(a: Array<string | { instId: string }>, b: Array<string | { instId: string }>): boolean {
+  const ai = eligibleIds(a);
+  const bi = eligibleIds(b);
+  if (ai.length !== bi.length) return false;
+  const set = new Set(ai);
+  return bi.every((x) => set.has(x));
+}
+
+/**
+ * Trigger proximity in pct: (trigger-mid)/mid*100, negative = price already
+ * through the trigger. Null when there is no breakout data or mid is unusable.
+ */
+export function toTriggerPctFor(s: CoinStats): number | null {
+  const t = s.breakout?.trigger;
+  if (t === null || t === undefined || !Number.isFinite(t)) return null;
+  if (!(s.mid > 0) || !Number.isFinite(s.mid)) return null;
+  return ((t - s.mid) / s.mid) * 100;
+}
+
+/** Sign of the trend score (-1|0|1), null when the coin has no trend data. */
+export function trendSignFor(s: CoinStats): -1 | 0 | 1 | null {
+  const score = s.trend?.score;
+  if (score === null || score === undefined || !Number.isFinite(score)) return null;
+  return score > 0 ? 1 : score < 0 ? -1 : 0;
+}
+
+/**
+ * Enrich each eligible instId with direction context from the live view.
+ * Pure: never mutates the view. Missing coins/data yield nulls (never throws).
+ */
+export function enrichEligible(eligible: string[], view: MarketView): ScoutEligibleEntry[] {
+  return eligible.map((instId) => {
+    const s = view.stats.get(instId);
+    return {
+      instId,
+      toTriggerPct: s ? toTriggerPctFor(s) : null,
+      trendSign: s ? trendSignFor(s) : null,
+    };
+  });
 }
 
 /** Top-`limit` excluded by 24h USD volume, so the stored why-not stays bounded. */

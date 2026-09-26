@@ -4,12 +4,43 @@ import { dirname } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import type { BeeId } from "./config.js";
 import type { BeeState, Position } from "./bees/types.js";
+import type { ScoutEligibleEntry } from "./scout.js";
 
 /** Backfill the one-shot take-profit flags on a stored position. Preserves set values across restores. */
 export function normalizePosition(p: Position): Position {
   p.trimmedAtR ??= null;
   p.beMoved ??= false;
   return p;
+}
+
+/**
+ * Parse the eligible JSON of a scout row. Current rows hold enriched
+ * {instId, toTriggerPct, trendSign} entries; rows from before the enrichment
+ * hold plain instId strings and normalize to null-context entries. Defensive:
+ * malformed entries are dropped, never thrown.
+ */
+export function parseScoutEligible(raw: string): ScoutEligibleEntry[] {
+  let v: unknown;
+  try {
+    v = JSON.parse(raw);
+  } catch {
+    return [];
+  }
+  if (!Array.isArray(v)) return [];
+  const out: ScoutEligibleEntry[] = [];
+  for (const e of v) {
+    if (typeof e === "string") {
+      out.push({ instId: e, toTriggerPct: null, trendSign: null });
+      continue;
+    }
+    if (typeof e !== "object" || e === null) continue;
+    const o = e as Record<string, unknown>;
+    if (typeof o.instId !== "string") continue;
+    const pct = typeof o.toTriggerPct === "number" && Number.isFinite(o.toTriggerPct) ? o.toTriggerPct : null;
+    const sign = o.trendSign === 1 || o.trendSign === -1 || o.trendSign === 0 ? o.trendSign : null;
+    out.push({ instId: o.instId, toTriggerPct: pct, trendSign: sign });
+  }
+  return out;
 }
 
 const SCHEMA = `
@@ -117,7 +148,8 @@ export interface GhostDecisionRow {
 /** A scout shortlist transition: what passed the screen plus a sampled why-not for the rest. Log-only, never gates trading. */
 export interface ScoutSnapshotRow {
   ts: number;
-  eligible: string[];
+  /** Enriched entries (direction context); legacy rows stored plain instId strings. */
+  eligible: ScoutEligibleEntry[];
   excluded: Array<{ instId: string; reasons: string[] }>;
 }
 
@@ -286,10 +318,13 @@ export class Db {
   }
 
   /** Scout path only: records a shortlist transition. Never touches orders/fills/decisions. */
-  insertScoutSnapshot(s: ScoutSnapshotRow): number {
+  insertScoutSnapshot(s: { ts: number; eligible: Array<string | ScoutEligibleEntry>; excluded: ScoutSnapshotRow["excluded"] }): number {
+    const eligible: ScoutEligibleEntry[] = s.eligible.map((e) =>
+      typeof e === "string" ? { instId: e, toTriggerPct: null, trendSign: null } : { instId: e.instId, toTriggerPct: e.toTriggerPct ?? null, trendSign: e.trendSign ?? null },
+    );
     const r = this.raw
       .prepare(`INSERT INTO scout_snapshots (ts, eligible, excluded) VALUES (?,?,?)`)
-      .run(s.ts, JSON.stringify(s.eligible), JSON.stringify(s.excluded));
+      .run(s.ts, JSON.stringify(eligible), JSON.stringify(s.excluded));
     return Number(r.lastInsertRowid);
   }
 
@@ -302,9 +337,26 @@ export class Db {
     return {
       id: row.id,
       ts: row.ts,
-      eligible: JSON.parse(row.eligible) as string[],
+      eligible: parseScoutEligible(row.eligible),
       excluded: JSON.parse(row.excluded) as Array<{ instId: string; reasons: string[] }>,
     };
+  }
+
+  /** Recent scout snapshots, newest first, at most `limit`. Powers GET /scout/history. */
+  scoutHistory(limit: number): Array<ScoutSnapshotRow & { id: number }> {
+    const n = Math.max(1, Math.min(50, Math.floor(limit) || 20));
+    const rows = this.raw.prepare(`SELECT id, ts, eligible, excluded FROM scout_snapshots ORDER BY id DESC LIMIT ?`).all(n) as Array<{
+      id: number;
+      ts: number;
+      eligible: string;
+      excluded: string;
+    }>;
+    return rows.map((row) => ({
+      id: row.id,
+      ts: row.ts,
+      eligible: parseScoutEligible(row.eligible),
+      excluded: JSON.parse(row.excluded) as Array<{ instId: string; reasons: string[] }>,
+    }));
   }
 
   pruneScoutSnapshots(olderThanTs: number): void {

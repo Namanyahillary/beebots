@@ -49,9 +49,27 @@ export interface PublicBee {
   last: LastDecision | null;
 }
 
+/** Direction context on a scout eligible entry (screening context, never a trade recommendation). */
+export interface ScoutEligibleEntry {
+  instId: string;
+  /** (trigger-mid)/mid*100; negative = through the trigger. Null when no breakout data. */
+  toTriggerPct: number | null;
+  /** Sign of trend.score (-1|0|1). Null when no trend data. */
+  trendSign: -1 | 0 | 1 | null;
+}
+
 export interface ScoutSnapshot {
   ts: number;
-  eligible: string[];
+  /** Enriched entries; rows stored before the enrichment read as plain instId strings. */
+  eligible: Array<string | ScoutEligibleEntry>;
+  excluded: Array<{ instId: string; reasons: string[] }>;
+}
+
+/** One row of GET /scout/history (newest first). */
+export interface ScoutHistoryRow {
+  id: number;
+  ts: number;
+  eligible: Array<string | ScoutEligibleEntry>;
   excluded: Array<{ instId: string; reasons: string[] }>;
 }
 
