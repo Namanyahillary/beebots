@@ -110,6 +110,8 @@ function EngineHelp({ styleId }: { styleId: string }) {
       <dl>
         <dt>Universe</dt>
         <dd>It takes one volatility breakout a day on BTC, ETH, SOL or HYPE.</dd>
+        <dt>Two triggers</dt>
+        <dd>Williams is the default entry at today open plus half of yesterday range. Stinger is the challenger at the previous day high on rising volume. Fills record which one fired.</dd>
         <dt>Presence</dt>
         <dd>It describes capability so it always shows even before any data arrives.</dd>
         <dt>Breakeven</dt>
@@ -158,12 +160,20 @@ export function BeeColumn({ name, bee, curve, baseline, rank, gap, flash, fills,
           </div>
           <div className="engine-badges">
             <span className="engine-badge">{styleLabel}</span>
-            {styleId === "bizzy" && (
-              <>
-                <span className="trigger-badge">BREAKOUT</span>
-                <span className="trigger-badge">STINGER</span>
-              </>
-            )}
+            {(bee?.triggers ?? (styleId === "bizzy" ? ["Williams breakout", "Stinger"] : []))
+              .filter((t) => {
+                // Skip the trigger that merely restates the engine family
+                // ("Williams breakout" vs family "Breakout") — it renders twice.
+                const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
+                const fam = norm(styleLabel);
+                const trg = norm(t);
+                return fam.length > 0 && trg.length > 0 && !trg.includes(fam) && !fam.includes(trg);
+              })
+              .map((t) => (
+                <span key={t} className="trigger-badge">
+                  {t.replace(/^Williams breakout$/i, "Williams")}
+                </span>
+              ))}
             <EngineHelp styleId={styleId} />
           </div>
           {meta.rules && (
