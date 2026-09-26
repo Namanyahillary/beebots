@@ -1,4 +1,5 @@
 import { memo, useState } from "react";
+import { useCollapsed } from "./collapse";
 import { Help } from "./Help";
 import { scoutAge } from "./Scout";
 import { TradeModal } from "./TradeModal";
@@ -21,10 +22,11 @@ const FillRow = memo(function FillRow({ fill, onOpen }: { fill: FillEvent; onOpe
 /** Recent fills, newest first. Clicking a row opens the trade (fill + linked decision). */
 export function Fills({ fills, decisions, leverage }: { fills: FillEvent[]; decisions: DecisionEvent[]; leverage?: { max: number; mode: string } }) {
   const [sel, setSel] = useState<FillEvent | null>(null);
+  const [collapsed, collapseBtn] = useCollapsed("fills");
   const rows = fills ?? [];
   const history = decisions ?? [];
   return (
-    <section className="rail-card fills">
+    <section className={`rail-card fills${collapsed ? " collapsed" : ""}`}>
       <div className="rail-head">
         <span className="eyebrow">
           Fills <Help title="Fills">
@@ -41,7 +43,10 @@ export function Fills({ fills, decisions, leverage }: { fills: FillEvent[]; deci
           </Help>
         </span>
         <span className="num dim">{rows.length > 0 ? `${rows.length} recent` : "none yet"}</span>
+        {collapseBtn}
       </div>
+      {!collapsed && (
+      <>
       {rows.length > 0 ? (
         <div className="fills-list">
           {rows.map((f) => (
@@ -50,6 +55,8 @@ export function Fills({ fills, decisions, leverage }: { fills: FillEvent[]; deci
         </div>
       ) : (
         <div className="dim">no fills yet</div>
+      )}
+      </>
       )}
       {sel && <TradeModal fill={sel} decisions={history} leverage={leverage} onClose={() => setSel(null)} />}
     </section>

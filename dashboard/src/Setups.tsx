@@ -1,4 +1,5 @@
 import { memo, useMemo } from "react";
+import { useCollapsed } from "./collapse";
 import { Help } from "./Help";
 import { scoutAge } from "./Scout";
 import type { DecisionEvent } from "./types";
@@ -36,8 +37,9 @@ export const Setups = memo(function Setups({ decisions }: { decisions: DecisionE
   }, [decisions]);
 
   const now = Date.now();
+  const [collapsed, collapseBtn] = useCollapsed("setups");
   return (
-    <section className="rail-card setups">
+    <section className={`rail-card setups${collapsed ? " collapsed" : ""}`}>
       <div className="rail-head">
         <span className="eyebrow">
           Setups <Help title="Setups">
@@ -58,7 +60,10 @@ export const Setups = memo(function Setups({ decisions }: { decisions: DecisionE
           </Help>
         </span>
         <span className="num dim">last {n}</span>
+        {collapseBtn}
       </div>
+      {!collapsed && (
+      <>
       {rows.length > 0 ? (
         <div className="setups-list num">
           {rows.map((r) => (
@@ -77,6 +82,8 @@ export const Setups = memo(function Setups({ decisions }: { decisions: DecisionE
       <div className="setups-context num dim">
         WAIT ×{waits} · HOLD ×{holds}
       </div>
+      </>
+      )}
     </section>
   );
 });

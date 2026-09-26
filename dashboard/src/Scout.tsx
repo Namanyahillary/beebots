@@ -1,4 +1,5 @@
 import { memo } from "react";
+import { useCollapsed } from "./collapse";
 import { Help } from "./Help";
 import type { ScoutSnapshot } from "./types";
 
@@ -24,9 +25,10 @@ const ExcludedRow = memo(function ExcludedRow({ instId, reasons }: { instId: str
 });
 
 export function Scout({ scout }: { scout: ScoutSnapshot | null | undefined }) {
+  const [collapsed, collapseBtn] = useCollapsed("scout");
   if (!scout) {
     return (
-      <section className="rail-card scout">
+      <section className={`rail-card scout${collapsed ? " collapsed" : ""}`}>
         <div className="rail-head">
           <span className="eyebrow">
             Scout <Help title="Scout">
@@ -45,12 +47,13 @@ export function Scout({ scout }: { scout: ScoutSnapshot | null | undefined }) {
           </Help>
           </span>
           <span className="num dim">no snapshot yet</span>
+          {collapseBtn}
         </div>
       </section>
     );
   }
   return (
-    <section className="rail-card scout">
+    <section className={`rail-card scout${collapsed ? " collapsed" : ""}`}>
       <div className="rail-head">
         <span className="eyebrow">
           Scout <Help title="Scout">
@@ -69,7 +72,10 @@ export function Scout({ scout }: { scout: ScoutSnapshot | null | undefined }) {
           </Help>
         </span>
         <span className="num dim">{scoutAge(scout.ts, Date.now())}</span>
+        {collapseBtn}
       </div>
+      {!collapsed && (
+      <>
       {scout.eligible.length > 0 ? (
         <div className="blocked-list num">
           {scout.eligible.map((id) => (
@@ -85,6 +91,8 @@ export function Scout({ scout }: { scout: ScoutSnapshot | null | undefined }) {
             <ExcludedRow key={e.instId} instId={e.instId} reasons={e.reasons} />
           ))}
         </div>
+      )}
+      </>
       )}
     </section>
   );

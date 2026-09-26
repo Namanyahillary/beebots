@@ -256,8 +256,8 @@ describe("lockedHold: rule-dictated ride never asks Jev (upstream parity)", () =
     });
     const exec = new SimExecutor(() => ({ tickers: V.tickers, instruments: V.instruments }), 0.0005, () => NOW);
     const engine = new Engine({ cfg, db, feed, jev, exec, bus, alerts: new Alerts(undefined), now: () => NOW });
-    const b = bee("boozy", { uplUsd: 0 });
-    b.position = position(doge, { contracts: 100, entryPx: 1, riskUsd: 10, stopPx, openedAt: NOW - 10 * 60_000, flatSince: null });
+    const b = bee("boozy", { uplUsd: 0, flatSince: null });
+    b.position = position(doge, { contracts: 100, entryPx: 1, riskUsd: 10, stopPx, openedAt: NOW - 10 * 60_000 });
     engine.bees["bee3"] = b;
     type E = { decide(id: string, now: number): Promise<void>; jevMade: Record<string, number>; last: Record<string, { status: string }> };
     const e = engine as unknown as E;

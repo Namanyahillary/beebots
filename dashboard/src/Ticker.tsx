@@ -1,5 +1,6 @@
 import { memo } from "react";
 import { BEE_META, type DecisionEvent } from "./types";
+import { useCollapsed } from "./collapse";
 
 const signed = (x: number) => `${x >= 0 ? "+" : "−"}$${Math.abs(x).toFixed(2)}`;
 
@@ -61,17 +62,21 @@ const Row = memo(function Row({ d }: { d: DecisionEvent }) {
 });
 
 export function Ticker({ decisions, perMin }: { decisions: DecisionEvent[]; perMin: number }) {
+  const [collapsed, collapseBtn] = useCollapsed("ticker");
   return (
-    <section className="rail-card ticker">
+    <section className={`rail-card ticker${collapsed ? " collapsed" : ""}`}>
       <div className="rail-head">
         <span className="eyebrow">Decision stream</span>
         <span className="num dim">{perMin}/min</span>
+        {collapseBtn}
       </div>
+      {!collapsed && (
       <ol className="ticks">
         {decisions.map((d) => (
           <Row key={`${d.ts}-${d.bee}`} d={d} />
         ))}
       </ol>
+      )}
     </section>
   );
 }

@@ -1794,3 +1794,18 @@ textarea.setup-input {
 .bee-fills-list .fill-row {
   grid-template-columns: 1fr auto auto;
 }
+.collapse-btn {
+  margin-left: auto;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 0.35rem;
+  color: var(--muted);
+  font-size: 0.8rem;
+  line-height: 1;
+  padding: 0.1rem 0.4rem;
+  cursor: pointer;
+}
+.collapse-btn:hover {
+  color: var(--text);
+  border-color: var(--line);
+}

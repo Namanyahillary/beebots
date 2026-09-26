@@ -10,6 +10,7 @@ import { Ticker } from "./Ticker";
 import { Toasts } from "./Toasts";
 import { BEE_META, BEE_NAMES } from "./types";
 import { useFeed } from "./useFeed";
+import { useCollapsed } from "./collapse";
 
 function readSoundPref(): boolean {
   try {
@@ -23,6 +24,8 @@ export function App() {
   const [soundOn, setSoundOn] = useState(false);
   const feed = useFeed(soundOn);
   const [, force] = useState(0);
+  const [boardCollapsed, boardCollapseBtn] = useCollapsed("board");
+  const [blockedCollapsed, blockedCollapseBtn] = useCollapsed("blocked");
 
   // Re-render every second so "ago" / flash windows expire even when the stream is quiet.
   useEffect(() => {
@@ -76,7 +79,7 @@ export function App() {
           );
         })}
         <aside className="rail">
-          <section className="rail-card board">
+          <section className={`rail-card board${boardCollapsed ? " collapsed" : ""}`}>
             <div className="rail-head">
               <span className="eyebrow">
                 Leaderboard <Help title="Leaderboard">
@@ -95,7 +98,10 @@ export function App() {
                 </Help>
               </span>
               <span className="dim">equity</span>
+              {boardCollapseBtn}
             </div>
+            {!boardCollapsed && (
+            <>
             {board.map((name, i) => {
               const b = feed.bees[name];
               const width = b ? Math.max(4, (b.equityUsd / Math.max(leaderEq, 1)) * 100) : 0;
@@ -111,14 +117,18 @@ export function App() {
                 </div>
               );
             })}
+            </>
+            )}
           </section>
           <Ticker decisions={feed.decisions} perMin={feed.decisionTimes.length} />
           <Fills fills={feed.fills} decisions={feed.decisions} leverage={feed.snap?.leverage} />
           <Scout scout={feed.snap?.scout} />
           <Setups decisions={feed.decisions} />
           {blocked.length > 0 && (
-            <section className="rail-card blocked">
+            <section className={`rail-card blocked${blockedCollapsed ? " collapsed" : ""}`}>
               <span className="eyebrow">Spread gate says no</span>
+              {blockedCollapseBtn}
+              {!blockedCollapsed && (
               <div className="blocked-list num">
                 {blocked.slice(0, 6).map((b) => (
                   <span key={b.coin}>
@@ -126,6 +136,7 @@ export function App() {
                   </span>
                 ))}
               </div>
+              )}
             </section>
           )}
         </aside>
