@@ -1,33 +1,33 @@
-/* beebots dashboard. Designed at 1920x1080 (1rem = 16px) and scaled with the viewport,
+/* Wolfpack dashboard. Designed at 1920x1080 (1rem = 16px) and scaled with the viewport,
    so a 3840x2160 capture is the same layout at 2x sharpness. */
 
 :root {
   color-scheme: dark;
-  --page: #08070c;
-  --card: #13121a;
-  --card-2: #1b1a24;
-  --line: rgba(255, 255, 255, 0.08);
-  --text: #ffffff;
-  --text-2: #c3c2b7;
-  --muted: #8a8894;
-  --grid: #24232d;
-  --axis: #45434f;
-  --muted-bar: #3a3946;
+  --page: #050907;
+  --card: #0d1512;
+  --card-2: #141f1a;
+  --line: rgba(200, 220, 215, 0.08);
+  --text: #e6edf3;
+  --text-2: #b0bac5;
+  --muted: #687782;
+  --grid: #16201b;
+  --axis: #2d3b34;
+  --muted-bar: #27352e;
 
-  /* Bee identity (validated dark categorical steps: yellow, violet, magenta; all-pairs CVD ΔE >= 13) */
-  --bizzy: #c98500;
-  --breezy: #9085e9;
-  --boozy: #d55181;
-  --bizzy-glow: rgba(201, 133, 0, 0.45);
-  --breezy-glow: rgba(144, 133, 233, 0.45);
-  --boozy-glow: rgba(213, 81, 129, 0.45);
+  /* Wolf identity (tactical predator identities: amber stalker, frost alpha, crimson chaser) */
+  --bizzy: #d97706;
+  --breezy: #94a3b8;
+  --boozy: #dc2626;
+  --bizzy-glow: rgba(217, 119, 6, 0.45);
+  --breezy-glow: rgba(148, 163, 184, 0.45);
+  --boozy-glow: rgba(220, 38, 38, 0.45);
 
-  /* Status (reserved; always paired with a glyph) */
-  --good: #0ca30c;
-  --good-text: #3fcf3f;
-  --warning: #fab219;
-  --critical: #d03b3b;
-  --critical-text: #ff6f6f;
+  /* Status (reserved; always paired with a glyph: ember-amber gains, blood-red losses) */
+  --good: #e07a1f;
+  --good-text: #ff9838;
+  --warning: #eab308;
+  --critical: #b91c1c;
+  --critical-text: #ff5555;
 
   --radius: 0.9rem;
   font-size: min(calc(100vw / 120), calc(100vh / 67.5));
@@ -154,30 +154,6 @@ body,
   padding: 0.55rem 0.95rem 0.6rem;
   min-width: 8.6rem;
 }
-a.counter.host {
-  color: var(--text);
-  text-decoration: none;
-  border-color: color-mix(in srgb, #673de6 55%, var(--line));
-  transition: border-color 0.2s, box-shadow 0.2s;
-}
-a.counter.host:hover {
-  border-color: #8c6cf0;
-  box-shadow: 0 0 1.2rem rgba(103, 61, 230, 0.35);
-}
-.host-row {
-  display: flex;
-  align-items: center;
-  gap: 0.45rem;
-  font-size: 1.3rem;
-  font-weight: 700;
-  margin: 0.2rem 0 0.1rem;
-  line-height: 1.6rem;
-}
-.host-mark {
-  width: 1.55rem;
-  height: 1.55rem;
-  flex: none;
-}
 .counter-value {
   font-size: 1.5rem;
   font-weight: 700;
@@ -256,7 +232,7 @@ a.counter.host:hover {
   padding: 0.15rem 0.5rem;
   cursor: pointer;
 }
-/* the logo line is narrower than the line under it, so the Hive button costs the header no width */
+/* the logo line is narrower than the line under it, so the Pack button costs the header no width */
 .brand-row {
   display: flex;
   align-items: center;
@@ -285,7 +261,7 @@ a.counter.host:hover {
   color: var(--good-text);
 }
 
-/* ---------- Hive dialog ---------- */
+/* ---------- Pack dialog ---------- */
 .modal-back {
   position: fixed;
   inset: 0;
@@ -427,7 +403,7 @@ a.counter.host:hover {
   gap: 1rem;
 }
 
-/* ---------- bee column ---------- */
+/* ---------- wolf column ---------- */
 .bee {
   position: relative;
   display: flex;
@@ -490,7 +466,7 @@ a.counter.host:hover {
   color: var(--muted);
   font-size: 0.75rem;
 }
-/* An owner's bee: its rules, one line, full text on hover */
+/* An owner's wolf: its rules, one line, full text on hover */
 .bee-rules {
   font-size: 0.72rem;
   color: var(--muted);
@@ -572,6 +548,25 @@ a.counter.host:hover {
 }
 .pos-px {
   font-size: 0.75rem;
+}
+/* Flat waiting bee: proximity label + fill bar. The bar reuses the meter
+   track/fill below, so it picks up the bee's own color via --bee. */
+.idle-prox {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  margin-top: 0.3rem;
+}
+.idle-prox-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.6rem;
+  font-size: 0.78rem;
+  color: var(--text-2);
+}
+.idle-prox-head .num {
+  color: var(--text);
+  white-space: nowrap;
 }
 
 .chart {
@@ -1208,9 +1203,6 @@ a.counter.host:hover {
   }
   .counter-value {
     font-size: 1.25rem;
-  }
-  .host-row {
-    font-size: 1.1rem;
   }
   .top-right {
     grid-column: 2;

@@ -14,6 +14,8 @@ export interface LastDecision {
   latencyMs: number | null;
   status: string;
   ts: number;
+  /** Structured idle state for a flat waiting bee (proximity bar data; absent for other bees). */
+  idle?: { label: string; coin?: string; pctAway?: number } | null;
 }
 
 export interface PublicBee {
@@ -99,6 +101,8 @@ export interface DecisionEvent {
   pulse?: boolean;
   /** Flat bee with nothing to ask Jev: what it is watching for (e.g. "SOL is 0.80% from breakout"). */
   watch?: string;
+  /** Structured idle state on watching rows (mirrors LastDecision.idle; drives the proximity bar). */
+  idle?: { label: string; coin?: string; pctAway?: number } | null;
   /** The bee's money at this moment: open P&L while positioned, total P&L when flat, and the move since its last row. */
   live?: { coin: string | null; side: "long" | "short" | null; valueUsd: number; kind: "open" | "total"; deltaUsd: number };
 }

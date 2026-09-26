@@ -102,6 +102,9 @@ export function BeeColumn({ name, bee, curve, baseline, rank, gap, flash, fills,
   const [showFills, setShowFills] = useState(false);
   const [sel, setSel] = useState<FillEvent | null>(null);
   const beeFills = (fills ?? []).filter((f) => f.bee === name);
+  // Structured idle state for a flat waiting bee (bizzy only, for now): drives
+  // the proximity bar. Absent = today's flat line exactly, no layout shift.
+  const idle = !p ? (bee?.last?.idle ?? null) : null;
 
   useEffect(() => {
     if (!showFills || sel) return;
@@ -174,10 +177,30 @@ export function BeeColumn({ name, bee, curve, baseline, rank, gap, flash, fills,
             </div>
           </>
         ) : (
-          <div className="pos-main">
-            <span className="side flat">FLAT</span>
-            <span className="dim">{bee?.flatMinutes ?? 0}m in cash</span>
-          </div>
+          <>
+            <div className="pos-main">
+              <span className="side flat">FLAT</span>
+              <span className="dim">{bee?.flatMinutes ?? 0}m in cash</span>
+            </div>
+            {idle && (
+              <div className="idle-prox">
+                <div className="idle-prox-head">
+                  <span>{idle.label}</span>
+                  {idle.coin && idle.pctAway != null && (
+                    <span className="num">
+                      {idle.coin} {idle.pctAway.toFixed(2)}% away
+                    </span>
+                  )}
+                </div>
+                {idle.pctAway != null && (
+                  <div className="meter-track">
+                    {/* Proximity scale: full at the trigger (0% away), draining to the floor at >=4% away. */}
+                    <div className="meter-fill" style={{ width: `${Math.max(3, Math.min(100, 100 - idle.pctAway * 25))}%` }} />
+                  </div>
+                )}
+              </div>
+            )}
+          </>
         )}
       </div>
 

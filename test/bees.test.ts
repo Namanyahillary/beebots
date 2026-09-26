@@ -65,6 +65,15 @@ describe("bizzy breakout (one Larry Williams breakout a day)", () => {
   it("idle status says how far the nearest coin is from its trigger", () => {
     expect(bizzy.idleStatus!(ctx("bizzy", bee("bizzy"), view([coin("SOL", { breakout: lvl }, 101)])))).toBe("SOL is 0.99% from breakout");
   });
+  it("idleDetail returns the nearest trigger coin with pct math (data, not parsed text)", () => {
+    const v = view([
+      coin("SOL", { breakout: lvl }, 100.5), // (102-100.5)/100.5*100 ≈ 1.49% away
+      coin("BTC", { breakout: lvl }, 101), // (102-101)/101*100 ≈ 0.99% away → nearest
+    ]);
+    expect(bizzy.idleDetail!(ctx("bizzy", bee("bizzy"), v))).toMatchObject({ label: "Waiting to pounce", coin: "BTC" });
+    expect(bizzy.idleDetail!(ctx("bizzy", bee("bizzy"), v))?.pctAway).toBeCloseTo(0.99, 2);
+    expect(bizzy.idleDetail!(ctx("bizzy", bee("bizzy"), view([coin("SOL", {}, 101)])))).toBeNull();
+  });
   it("positioned: HOLD always, CUT_LOSS only while losing", () => {
     const s = coin("SOL", { breakout: lvl }, 103);
     const win = bizzy.menu(ctx("bizzy", bee("bizzy", { position: position(s), flatSince: null, uplUsd: 1 }), view([s])));

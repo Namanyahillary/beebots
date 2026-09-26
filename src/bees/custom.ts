@@ -71,6 +71,7 @@ export function customBrain(base: BeeBrain, o: CustomRules): BeeBrain {
     },
     sizeFrac: (intent, conviction, ctx) => base.sizeFrac(intent, conviction, narrow(ctx)),
     ...(base.idleStatus ? { idleStatus: (ctx: BeeContext) => base.idleStatus!(narrow(ctx)) } : {}),
+    ...(base.idleDetail ? { idleDetail: (ctx: BeeContext) => base.idleDetail!(narrow(ctx)) } : {}),
     ...(base.rebalance ? { rebalance: (ctx: BeeContext) => base.rebalance!(narrow(ctx)) } : {}),
     // stopFor, trail, timeStopMinutes and openGate see the full market: they are about the coin the bee holds.
   };

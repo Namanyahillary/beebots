@@ -1,7 +1,7 @@
 import { customBrain } from "./bees/custom.js";
 import { BRAINS } from "./bees/index.js";
 import { maxNotionalUsd, minutesSince, positionNotional } from "./bees/common.js";
-import { coinOf, type Action, type BeeBrain, type BeeContext, type BeeState, type Intent, type Menu, type Position, type Side } from "./bees/types.js";
+import { coinOf, type Action, type BeeBrain, type BeeContext, type BeeState, type IdleDetail, type Intent, type Menu, type Position, type Side } from "./bees/types.js";
 import { BEES, STYLES, type BeeId, type Config } from "./config.js";
 import type { Alerts } from "./alerts.js";
 import type { Db } from "./db.js";
@@ -244,6 +244,8 @@ interface LastDecision {
   latencyMs: number | null;
   status: string;
   ts: number;
+  /** Structured idle state for the dashboard proximity bar (null when positioned, asking Jev, or brain has none). */
+  idle: IdleDetail | null;
 }
 
 export class Engine {
@@ -707,10 +709,11 @@ export class Engine {
         : cached
           ? (Object.entries(cached.probabilities).sort((a, b) => b[1] - a[1]).slice(0, 3) as Array<[string, number]>)
           : [];
-    this.last[id] = { choice: r && r.ok ? r.choice : (cached?.choice ?? null), top3, confidence: r && r.ok ? r.confidence : (cached?.confidence ?? null), latencyMs: r ? r.latencyMs : null, status, ts: now };
     // Flat and nothing to ask Jev (bizzy waiting for her breakout): a live "watching" row every PULSE_MS instead of a
     // "no call" row every tick, so the stream shows how close the trigger is.
     const watching = jevStatus === "no_options" && !bee.position && !!brain.idleStatus && risk.action.kind === "none";
+    const idle = watching ? (brain.idleDetail?.(ctx) ?? null) : null;
+    this.last[id] = { choice: r && r.ok ? r.choice : (cached?.choice ?? null), top3, confidence: r && r.ok ? r.confidence : (cached?.confidence ?? null), latencyMs: r ? r.latencyMs : null, status, ts: now, idle };
     if (watching && now - (this.lastPulseAt[id] ?? 0) < PULSE_MS) {
       db.saveBee(bee, now);
       return;
@@ -723,7 +726,7 @@ export class Engine {
         decisionId,
         menu: Object.keys(menu),
         choice: r && r.ok ? r.choice : watching ? "WATCHING" : (cached?.choice ?? null),
-        ...(watching ? { watch: status } : {}),
+        ...(watching ? { watch: status, idle } : {}),
         probabilities: top3.map(([label, p]) => ({ label, p: Number(p.toFixed(3)) })),
         confidence: r && r.ok ? Number(r.confidence.toFixed(3)) : (cached ? Number(cached.confidence.toFixed(3)) : null),
         conviction: r && r.ok ? brain.convictionLabels[r.conviction] : cached ? brain.convictionLabels[cached.conviction] : null,
@@ -786,7 +789,7 @@ export class Engine {
       }
     }
     const prev = this.last[id];
-    this.last[id] = { choice: null, top3: prev?.top3 ?? [], confidence: null, latencyMs: null, status: benchStatus, ts: now };
+    this.last[id] = { choice: null, top3: prev?.top3 ?? [], confidence: null, latencyMs: null, status: benchStatus, ts: now, idle: null };
     if (risk.action.kind !== "none") {
       const decisionId = db.insertDecision({
         bee: id, ts: now, stateHash: "", stateJson: "{}", menuJson: "[]", choice: null, probabilities: null, confidence: null,

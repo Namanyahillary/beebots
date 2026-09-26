@@ -56,6 +56,14 @@ export interface BeeState {
   top1: { coin: string | null; streak: number; rankedAt: number };
 }
 
+/** Structured idle state for a flat bee with nothing on the menu (drives the
+ * dashboard proximity bar; data, never parsed from the status string). */
+export interface IdleDetail {
+  label: string;
+  coin?: string;
+  pctAway?: number;
+}
+
 /** What a menu option means, in code. The risk layer turns this into a final action. */
 export type Intent =
   | { kind: "hold" }
@@ -129,6 +137,9 @@ export interface BeeBrain {
   neverForce?: boolean;
   /** Status line while flat with nothing on the menu (e.g. "waiting for a breakout"). */
   idleStatus?: (ctx: BeeContext) => string;
+  /** Structured version of the idle state (for the dashboard proximity bar).
+   * Brains without it keep today's behavior exactly (no idle payload). */
+  idleDetail?: (ctx: BeeContext) => IdleDetail | null;
 }
 
 export const coinOf = (instId: string) => instId.split("-")[0]!;
