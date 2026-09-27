@@ -183,9 +183,9 @@ export interface BeeMeta {
 
 /** Colours belong to the slot, so two bees on the same style still look different. Filled in from /profile at load. */
 export const BEE_META: Record<BeeName, BeeMeta> = {
-  bee1: { short: "Grim", tagline: "the grinder", styleLabel: "Breakout", rules: "", coins: [], img: "/bees/boozy.jpg", color: "var(--bizzy)", glow: "var(--bizzy-glow)" },
-  bee2: { short: "Silver", tagline: "the calculated one", styleLabel: "Trend", rules: "", coins: [], img: "/bees/breezy.jpg", color: "var(--breezy)", glow: "var(--breezy-glow)" },
-  bee3: { short: "Blaze", tagline: "the degen", styleLabel: "Momentum", rules: "", coins: [], img: "/bees/bizzy.jpg", color: "var(--boozy)", glow: "var(--boozy-glow)" },
+  bee1: { short: "Grim", tagline: "the grinder", styleLabel: "Breakout", rules: "", coins: [], img: "/bees/grim.jpg", color: "var(--bizzy)", glow: "var(--bizzy-glow)" },
+  bee2: { short: "Silver", tagline: "the calculated one", styleLabel: "Trend", rules: "", coins: [], img: "/bees/silver.jpg", color: "var(--breezy)", glow: "var(--breezy-glow)" },
+  bee3: { short: "Blaze", tagline: "the degen", styleLabel: "Momentum", rules: "", coins: [], img: "/bees/blaze.jpg", color: "var(--boozy)", glow: "var(--boozy-glow)" },
 };
 
 export interface Profile {

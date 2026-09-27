@@ -55,7 +55,7 @@ export const BRAND = {
       blurb: "One volatility breakout a day on BTC, ETH, SOL or HYPE, ridden to the daily close. Sits in silence, then strikes at full size.",
       color: "var(--bizzy)",
       glow: "var(--bizzy-glow)",
-      img: "/bees/boozy.jpg",
+      img: "/bees/grim.jpg",
     },
     bee2: {
       name: "Silver",
@@ -64,7 +64,7 @@ export const BRAND = {
       blurb: "Trend following on BTC and ETH only. Few trades, rides winners, sized by volatility. Calm and unshakeable.",
       color: "var(--breezy)",
       glow: "var(--breezy-glow)",
-      img: "/bees/breezy.jpg",
+      img: "/bees/silver.jpg",
     },
     bee3: {
       name: "Blaze",
@@ -73,7 +73,7 @@ export const BRAND = {
       blurb: "Chases the strongest 7-day mover across every liquid coin, and pyramids into winners. Fast and aggressive.",
       color: "var(--boozy)",
       glow: "var(--boozy-glow)",
-      img: "/bees/bizzy.jpg",
+      img: "/bees/blaze.jpg",
     },
   },
 
