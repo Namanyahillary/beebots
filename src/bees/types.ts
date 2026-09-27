@@ -81,6 +81,8 @@ export interface IdleDetail {
   label: string;
   coin?: string;
   pctAway?: number;
+  /** Current touch price of the watched coin (so a flat card still shows the market). */
+  midPx?: number;
 }
 
 /** What a menu option means, in code. The risk layer turns this into a final action. */

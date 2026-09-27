@@ -73,6 +73,7 @@ describe("bizzy breakout (one Larry Williams breakout a day)", () => {
     ]);
     expect(bizzy.idleDetail!(ctx("bizzy", bee("bizzy"), v))).toMatchObject({ label: "Waiting to pounce", coin: "BTC" });
     expect(bizzy.idleDetail!(ctx("bizzy", bee("bizzy"), v))?.pctAway).toBeCloseTo(0.99, 2);
+    expect(bizzy.idleDetail!(ctx("bizzy", bee("bizzy"), v))?.midPx).toBe(101);
     expect(bizzy.idleDetail!(ctx("bizzy", bee("bizzy"), view([coin("SOL", {}, 101)])))).toBeNull();
   });
   it("positioned: HOLD always, CUT_LOSS only while losing", () => {

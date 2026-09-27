@@ -910,7 +910,8 @@ private filterVenueMenu(menu: Menu, coins: string[]): Menu {
       if (lock) benchStatus = `${benchStatus}; ${lock}`;
     }
     const prev = this.last[id];
-    this.last[id] = { choice: null, top3: prev?.top3 ?? [], confidence: null, latencyMs: null, status: benchStatus, ts: now, idle: null };
+    // Benched bees still watch their triggers (they just can't act): keep the proximity bar + price live.
+    this.last[id] = { choice: null, top3: prev?.top3 ?? [], confidence: null, latencyMs: null, status: benchStatus, ts: now, idle: this.brain(id).idleDetail?.(ctx) ?? null };
     if (risk.action.kind !== "none") {
       const decisionId = db.insertDecision({
         bee: id, ts: now, stateHash: "", stateJson: "{}", menuJson: "[]", choice: null, probabilities: null, confidence: null,

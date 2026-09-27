@@ -65,10 +65,10 @@ const toTrigger = (s: CoinStats) => (s.breakout ? ((s.breakout.trigger - s.mid) 
 const nextUtcMidnight = (ms: number) => (Math.floor(ms / 86_400_000) + 1) * 86_400_000;
 
 /** Nearest of bizzy's own 4 trigger coins by % still to rise (null = no trigger data). */
-function nearestOwn(ctx: BeeContext): { coin: string; pct: number } | null {
+function nearestOwn(ctx: BeeContext): { coin: string; pct: number; mid: number } | null {
   const rows = breakoutStats(ctx)
-    .map((s) => ({ coin: s.coin, pct: toTrigger(s) }))
-    .filter((x): x is { coin: string; pct: number } => x.pct !== null)
+    .map((s) => ({ coin: s.coin, pct: toTrigger(s), mid: s.mid }))
+    .filter((x): x is { coin: string; pct: number; mid: number } => x.pct !== null)
     .sort((a, b) => a.pct - b.pct);
   return rows[0] ?? null;
 }
@@ -108,7 +108,7 @@ export const bizzy: BeeBrain = {
     // Same nearest-trigger computation as idleStatus, own 4-coin list only
     // (scout-wide coins are watch-only intel, never bizzy's trigger).
     const own = nearestOwn(ctx);
-    return own ? { label: "Waiting to pounce", coin: own.coin, pctAway: own.pct } : null;
+    return own ? { label: "Waiting to pounce", coin: own.coin, pctAway: own.pct, midPx: own.mid } : null;
   },
 
   universe(ctx) {

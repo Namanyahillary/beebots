@@ -269,7 +269,7 @@ export function BeeColumn({ name, bee, curve, baseline, rank, gap, flash, fills,
                   <span>{idle.label}</span>
                   {idle.coin && idle.pctAway != null && (
                     <span className="num">
-                      {idle.coin} {idle.pctAway.toFixed(2)}% away
+                      {idle.coin} {idle.midPx != null ? `${px(idle.midPx)} · ` : ""}{idle.pctAway.toFixed(2)}% away
                     </span>
                   )}
                 </div>
