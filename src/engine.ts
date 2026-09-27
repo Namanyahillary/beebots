@@ -329,7 +329,7 @@ export class Engine {
     }
 
     await this.refreshMarket();
-    if (this.d.exec.kind === "okx") await this.reconcile();
+    if (this.d.exec.kind !== "sim") await this.reconcile();
 
     this.d.bus.emit("status", { event: "engine_start", mode: cfg.mode, tickMs: cfg.tickMs });
     this.d.alerts.send(`engine started (MODE=${cfg.mode})`);
@@ -434,7 +434,7 @@ export class Engine {
         }
       }
       this.d.bus.emit("equity", { bees: BEES.map((id) => this.publicBee(id)) }, now);
-      if (this.d.exec.kind === "okx" && now - this.lastReconAt >= RECON_MS) await this.reconcile();
+      if (this.d.exec.kind !== "sim" && now - this.lastReconAt >= RECON_MS) await this.reconcile();
       this.checkJevOutage(now);
     } finally {
       this.ticking = false;
@@ -608,6 +608,20 @@ export class Engine {
     }
   }
 
+/** Paper mode: keep only venue-tradable opens (long, allowlisted coin). RIDE/HOLD-style options have no instId and pass through. */
+private filterVenueMenu(menu: Menu, coins: string[]): Menu {
+  const out: Menu = {};
+  for (const [label, opt] of Object.entries(menu)) {
+    const i = opt.intent;
+    if (i.kind === "open" || i.kind === "switch") {
+      if (i.side === "short") continue;
+      if (!coins.includes(coinOf(i.instId).toUpperCase())) continue;
+    }
+    out[label] = opt;
+  }
+  return out;
+}
+
   private async decide(id: BeeId, now: number): Promise<void> {    const { cfg, db, bus, jev } = this.d;
     const brain = this.brain(id);
     const bee = this.bees[id];
@@ -615,7 +629,10 @@ export class Engine {
     // chose could be acted on; only code can close the position (stop, time stop, loss stop) until 00:00 UTC.
     if (bee.cap === "trade_cap" || bee.cap === "fee_budget") return this.decideBenched(id, now);
     const ctx = this.ctx(id, now);
-    const menu = brain.menu(ctx);
+    const rawMenu = brain.menu(ctx);
+    // Paper venue: never deliberate coins that don't exist on Alpaca or sides it can't take
+    // (long-only spot). Risk vetoes stay as backstop for forced entries that bypass the menu.
+    const menu = cfg.mode === "paper" ? this.filterVenueMenu(rawMenu, cfg.paper.coins) : rawMenu;
     const snap = buildSnapshot(brain, ctx);
     if (brain.id === "boozy" && bee.top1.coin) snap.state.top1 = `${bee.top1.coin} x${bee.top1.streak}`;
 
@@ -964,7 +981,7 @@ export class Engine {
     if (!this.closeAnnounced && BEES.every((id) => !this.bees[id].position)) {
       this.closeAnnounced = true;
       this.d.db.setMeta("experiment_flat_at", String(now));
-      this.lastReconAt = 0; // confirm flat against OKX on the next tick
+      this.lastReconAt = 0; // confirm flat against the venue on the next tick
       this.d.bus.emit("status", { event: "experiment_closed" }, now);
       this.d.alerts.send("experiment closed: every bee is flat");
     }
@@ -1108,7 +1125,7 @@ export class Engine {
     }
   }
 
-  /** Every 5 min (demo/live): our position and fees vs OKX. On mismatch, adopt OKX's position and go red. */
+  /** Every 5 min off-sim: our position and fees vs the venue. On mismatch, adopt the venue's position and go red. */
   async reconcile(): Promise<void> {
     const now = this.now();
     this.lastReconAt = now;
@@ -1118,7 +1135,7 @@ export class Engine {
       const bee = this.bees[id];
       const ex = await this.d.exec.positions(id);
       if (ex === null) {
-        diffs.push(`${this.d.cfg.slots[id].name}: could not read OKX positions`);
+        diffs.push(`${this.d.cfg.slots[id].name}: could not read ${this.d.exec.venue} positions`);
         continue;
       }
       const theirs = ex[0];
@@ -1127,7 +1144,7 @@ export class Engine {
       const theirSigned = theirs?.pos ?? 0;
       const sameInst = (ours?.instId ?? null) === (theirs?.instId ?? null);
       let ok = ex.length <= 1 && sameInst && Math.abs(oursSigned - theirSigned) < 1e-9;
-      let detail = ok ? "match" : `ours ${ours ? `${ours.side} ${ours.contracts} ${ours.coin}` : "flat"} vs OKX ${theirs ? `${theirs.pos} ${theirs.instId.split("-")[0]}` : "flat"}`;
+      let detail = ok ? "match" : `ours ${ours ? `${ours.side} ${ours.contracts} ${ours.coin}` : "flat"} vs ${this.d.exec.venue} ${theirs ? `${theirs.pos} ${theirs.instId.split("-")[0]}` : "flat"}`;
 
       // Fees to the cent on our recent filled orders.
       const rows = this.d.db.raw
@@ -1140,13 +1157,13 @@ export class Engine {
           const theirSum = [...theirFees.values()].reduce((a, b) => a + b, 0);
           if (Math.abs(ourSum - theirSum) >= 0.005) {
             ok = false;
-            detail += `; fees ours $${ourSum.toFixed(2)} vs OKX $${theirSum.toFixed(2)}`;
+            detail += `; fees ours $${ourSum.toFixed(2)} vs ${this.d.exec.venue} $${theirSum.toFixed(2)}`;
           }
         }
       }
 
       if (!sameInst || Math.abs(oursSigned - theirSigned) >= 1e-9) {
-        // OKX is the truth: rebuild the position from it.
+        // The venue is the truth: rebuild the position from it.
         if (!theirs) {
           bee.position = null;
           bee.flatSince ??= now;
@@ -1179,7 +1196,7 @@ export class Engine {
     }
     const ok = diffs.length === 0;
     const was = this.recon.ok;
-    this.recon = { ok, detail: ok ? "books match OKX" : diffs.join(" | "), ts: now };
+    this.recon = { ok, detail: ok ? `books match ${this.d.exec.venue}` : diffs.join(" | "), ts: now };
     this.d.bus.emit("recon", { ok, detail: this.recon.detail }, now);
     if (!ok && was !== false) this.d.alerts.send(`reconciliation mismatch: ${this.recon.detail}`);
   }

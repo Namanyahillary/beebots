@@ -9,6 +9,7 @@ import { EventBus } from "./events.js";
 import { hashPassword, MIN_PASSWORD } from "./gate.js";
 import { Hive, hivePath } from "./hive.js";
 import { OkxExecutor, SimExecutor, type Executor } from "./exec/executor.js";
+import { AlpacaExecutor } from "./exec/alpaca.js";
 import { Jev } from "./jev.js";
 import { log, setLogLevel } from "./log.js";
 import { OpenRouterSystemOne } from "./openrouter.js";
@@ -127,7 +128,9 @@ async function main() {
   const exec: Executor =
     cfg.mode === "dry"
       ? new SimExecutor(() => feed.view(), cfg.risk.takerFeeRate)
-      : new OkxExecutor(cli, cfg.creds, demo, (id) => feed.view().instruments.get(id), cfg.risk.maxLeverage);
+      : cfg.mode === "paper"
+        ? new AlpacaExecutor(cfg.paper.baseUrl, cfg.alpCreds, (id) => feed.view().instruments.get(id), () => feed.view().instruments)
+        : new OkxExecutor(cli, cfg.creds, demo, (id) => feed.view().instruments.get(id), cfg.risk.maxLeverage);
 
   const startOfDay = Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), new Date().getUTCDate());
   const jevOpts = { ...cfg.jev, spentTodayUsd: db.jevSpendSince(startOfDay) };

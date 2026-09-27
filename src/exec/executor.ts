@@ -32,12 +32,14 @@ export interface FundingBill {
 }
 
 export interface Executor {
-  readonly kind: "sim" | "okx";
+  readonly kind: "sim" | "okx" | "alpaca";
+  /** Human venue name for status and reconcile messages. Never a secret. */
+  readonly venue: string;
   init(bee: BeeId): Promise<void>;
   market(bee: BeeId, req: OrderReq): Promise<OrderResult>;
   positions(bee: BeeId): Promise<ExchangePosition[] | null>;
   fundingBills(bee: BeeId): Promise<FundingBill[] | null>;
-  /** Fees OKX charged for these order ids (USD, positive = paid). */
+  /** Fees the venue charged for these order ids (USD, positive = paid). */
   feesFor(bee: BeeId, instIds: string[], ordIds: Set<string>): Promise<Map<string, number> | null>;
 }
 
@@ -46,6 +48,7 @@ export interface Executor {
  */
 export class SimExecutor implements Executor {
   readonly kind = "sim" as const;
+  readonly venue = "sim";
   constructor(
     private market_: () => { tickers: Map<string, Ticker>; instruments: Map<string, Instrument> },
     private takerFeeRate: number,
@@ -84,6 +87,7 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
  */
 export class OkxExecutor implements Executor {
   readonly kind = "okx" as const;
+  readonly venue = "OKX";
   private leverageSet = new Set<string>();
 
   constructor(

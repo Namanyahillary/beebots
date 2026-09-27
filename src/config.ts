@@ -11,7 +11,7 @@ const DEFAULT_SLOTS: Record<BeeId, StyleId> = { bee1: "bizzy", bee2: "breezy", b
 /** Typed as the only acknowledgement that unlocks MODE=live. */
 export const LIVE_ACK_PHRASE = "I-ACCEPT-REAL-MONEY-RISK";
 
-export type Mode = "dry" | "demo" | "live";
+export type Mode = "dry" | "demo" | "live" | "paper";
 
 const bool = (def: boolean) =>
   z
@@ -58,12 +58,14 @@ const perSlot = (prefix: string) => ({
   [`${prefix}_OKX_DEMO_API_KEY`]: opt,
   [`${prefix}_OKX_DEMO_API_SECRET`]: opt,
   [`${prefix}_OKX_DEMO_API_PASSPHRASE`]: opt,
+  [`${prefix}_ALPACA_API_KEY`]: opt,
+  [`${prefix}_ALPACA_API_SECRET`]: opt,
 });
 
 const EnvSchema = z.object({
-  // DRY_RUN=true (the default) forces MODE=dry whatever MODE says. Going to demo or live needs both DRY_RUN=false and MODE set.
+  // DRY_RUN=true (the default) forces MODE=dry whatever MODE says. Demo, live and paper need DRY_RUN=false and MODE set.
   DRY_RUN: bool(true),
-  MODE: z.enum(["dry", "demo", "live"]).optional().default("dry"),
+  MODE: z.enum(["dry", "demo", "live", "paper"]).optional().default("dry"),
 
   TYPESAFE_API_KEY: opt,
   JEV_MODEL: str("jev-1.13.0"),
@@ -88,6 +90,12 @@ const EnvSchema = z.object({
   OKX_CLI_TIMEOUT_MS: num(15_000),
 
   BEE_START_EQUITY_USD: num(333),
+  // Alpaca paper (MODE=paper): spot-only, long-only execution through one Alpaca paper account per bee.
+  // Market data stays on OKX (free, no Alpaca data subscription needed). Internal books start at
+  // ALPACA_START_EQUITY_USD per bee — percentages carry across, figures stay sane.
+  ALPACA_BASE_URL: str("https://paper-api.alpaca.markets"),
+  ALPACA_START_EQUITY_USD: num(100),
+  ALPACA_COINS: str("BTC,ETH,SOL,HYPE"),
   MAX_LEVERAGE: num(2),
   MARGIN_MODE: z.literal("isolated").optional().default("isolated"),
   MAX_NOTIONAL_USD_PER_BEE: num(700),
@@ -118,7 +126,7 @@ const EnvSchema = z.object({
 
   ENGINE_PORT: num(8080),
   ENGINE_BIND: str("127.0.0.1"),
-  // "{mode}" is replaced with dry/demo/live, so each mode keeps its own books.
+  // "{mode}" is replaced with the mode name, so each mode keeps its own books.
   DB_PATH: str("./data/bees-{mode}.sqlite"),
   // Written by the Setup page. Anything set in the environment wins over it.
   SETTINGS_PATH: str("./data/settings.json"),
@@ -152,6 +160,11 @@ export interface OkxCreds {
   apiKey: string;
   secretKey: string;
   passphrase: string;
+}
+
+export interface AlpacaCreds {
+  apiKey: string;
+  secretKey: string;
 }
 
 /** A bee as the dashboard shows it. No secrets. */
@@ -202,6 +215,10 @@ export interface Config {
   boozy: { candidates: number };
   /** Per-bee OKX credentials for the current mode. Never logged, never sent to the dashboard. */
   creds: Partial<Record<BeeId, OkxCreds>>;
+  /** Per-bee Alpaca credentials (paper mode only). Never logged, never sent to the dashboard. */
+  alpCreds: Partial<Record<BeeId, AlpacaCreds>>;
+  /** Paper venue: Alpaca base URL, per-bee book equity, and the tradeable coin allowlist. */
+  paper: { baseUrl: string; startEquityUsd: number; coins: string[] };
   server: { port: number; bind: string };
   dbPath: string;
   logLevel: "debug" | "info" | "warn" | "error";
@@ -252,7 +269,17 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, settings: Setti
   });
 
   const creds: Partial<Record<BeeId, OkxCreds>> = {};
-  if (mode !== "dry") {
+  const alpCreds: Partial<Record<BeeId, AlpacaCreds>> = {};
+  if (mode === "paper") {
+    for (const bee of BEES) {
+      const p = bee.toUpperCase();
+      const k = e[`${p}_ALPACA_API_KEY`] as string | undefined;
+      const s = e[`${p}_ALPACA_API_SECRET`] as string | undefined;
+      if (!k) missing.push(`${p}_ALPACA_API_KEY`);
+      if (!s) missing.push(`${p}_ALPACA_API_SECRET`);
+      if (k && s) alpCreds[bee] = { apiKey: k, secretKey: s };
+    }
+  } else if (mode !== "dry") {
     const infix = mode === "demo" ? "OKX_DEMO_API" : "OKX_API";
     for (const bee of BEES) {
       const p = bee.toUpperCase();
@@ -303,7 +330,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, settings: Setti
     dataRefreshMs: Math.max(15_000, e.DATA_REFRESH_MS),
     okx: { site: e.OKX_SITE, apiBase: e.OKX_API_BASE.replace(/\/+$/, ""), cliTimeoutMs: e.OKX_CLI_TIMEOUT_MS },
     risk: {
-      startEquityUsd: e.BEE_START_EQUITY_USD,
+      startEquityUsd: mode === "paper" ? e.ALPACA_START_EQUITY_USD : e.BEE_START_EQUITY_USD,
       maxLeverage: e.MAX_LEVERAGE,
       maxNotionalUsdPerBee: e.MAX_NOTIONAL_USD_PER_BEE,
       dailyLossStopPct: e.DAILY_LOSS_STOP_PCT,
@@ -319,6 +346,12 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, settings: Setti
     bizzy: { sizeFraction: e.BIZZY_SIZE_FRACTION, universeSize: e.BIZZY_UNIVERSE_SIZE, timeStopMinutes: e.BIZZY_TIME_STOP_MINUTES },
     boozy: { candidates: e.BOOZY_CANDIDATES },
     creds,
+    alpCreds,
+    paper: {
+      baseUrl: (e.ALPACA_BASE_URL as string).replace(/\/+$/, ""),
+      startEquityUsd: e.ALPACA_START_EQUITY_USD as number,
+      coins: (e.ALPACA_COINS as string).split(",").map((c) => c.trim().toUpperCase()).filter(Boolean),
+    },
     server: { port: e.ENGINE_PORT, bind: e.ENGINE_BIND },
     dbPath: e.DB_PATH.replaceAll("{mode}", mode),
     logLevel: e.LOG_LEVEL,

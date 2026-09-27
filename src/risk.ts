@@ -93,6 +93,14 @@ interface OpenCheck {
 function checkOpen(intent: Intent, input: RiskInput, conviction: number): OpenCheck {
   const { ctx, brain, sizeMult } = input;
   const { bee, view, knobs } = ctx;
+
+  // Paper venue (Alpaca spot): long-only, and only the allowlisted coins exist there.
+  // Central gate: every open path (proposal, forced entry, rebalance) funnels through here.
+  if (ctx.cfg.mode === "paper" && (intent.kind === "open" || intent.kind === "switch")) {
+    if (intent.side === "short") return { ok: false, why: `venue_short ${intent.instId} (Alpaca spot is long-only)` };
+    const coin = view.stats.get(intent.instId)?.coin ?? view.instruments.get(intent.instId)?.coin;
+    if (!coin || !ctx.cfg.paper.coins.includes(coin)) return { ok: false, why: `venue_no_coin ${coin ?? intent.instId} (not on Alpaca)` };
+  }
   const max = maxNotionalUsd(ctx) * sizeMult;
   if (!(max > 0)) return { ok: false, why: "no_equity" };
 

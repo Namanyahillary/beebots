@@ -92,3 +92,33 @@ describe("openrouter timeout", () => {
     expect(tight.jev.timeoutMs).toBe(1000);
   });
 });
+
+describe("paper mode (Alpaca)", () => {
+  const keys: Record<string, string> = { TYPESAFE_API_KEY: "k", DRY_RUN: "false", MODE: "paper" };
+  for (const b of ["BEE1", "BEE2", "BEE3"]) {
+    keys[`${b}_ALPACA_API_KEY`] = `${b}-key`;
+    keys[`${b}_ALPACA_API_SECRET`] = `${b}-secret`;
+  }
+  it("loads per-bee Alpaca creds and $100 books, no OKX keys needed", () => {
+    const cfg = loadConfig(keys);
+    expect(cfg.mode).toBe("paper");
+    expect(cfg.alpCreds.bee2).toEqual({ apiKey: "BEE2-key", secretKey: "BEE2-secret" });
+    expect(cfg.creds).toEqual({});
+    expect(cfg.risk.startEquityUsd).toBe(100);
+    expect(cfg.paper.coins).toEqual(["BTC", "ETH", "SOL", "HYPE"]);
+    expect(cfg.dbPath).toMatch(/bees-paper\.sqlite/);
+  });
+  it("lists missing Alpaca key NAMES only", () => {
+    let msg = "";
+    try {
+      loadConfig({ TYPESAFE_API_KEY: "k", DRY_RUN: "false", MODE: "paper" });
+    } catch (e) {
+      msg = (e as Error).message;
+    }
+    expect(msg).toMatch(/BEE1_ALPACA_API_KEY/);
+    expect(msg).toMatch(/BEE3_ALPACA_API_SECRET/);
+  });
+  it("needs no LIVE_ACK (paper is not real money)", () => {
+    expect(loadConfig(keys).mode).toBe("paper");
+  });
+});

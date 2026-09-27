@@ -25,7 +25,8 @@ first for philosophy + verdicts; this file is branch state + working agreements.
   (log-only) is always shippable, enforcement needs evidence.
 
 ## What's next (in order, don't bundle)
-1. Paper-observe ≥ 7 days; collect the six metrics in PROFIT_MODE.md.
+1. Alpaca paper launch (see `docs/ALPACA_PAPER.md`): `DRY_RUN=false MODE=paper pnpm dev`.
+   $100 books, OKX data + Alpaca execution. Blaze constrained by venue (allowlist, 1x).
 2. neverForce A/B on breezy/boozy (needs prompt rewrite + idleStatus if flipped).
 3. Scout-gating decision (needs lift evidence from snapshots).
 4. P5 veto vs shared-key topology decision (alert rate decides).

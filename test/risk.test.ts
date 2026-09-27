@@ -387,3 +387,32 @@ describe("takeProfitSignal ladder (recurring banking)", () => {
     expect(takeProfitSignal(mk({ trimmedAtR: null, beMoved: true }), 5, beOnly)?.trim).toBeUndefined();
   });
 });
+
+describe("paper venue gates (Alpaca spot: long-only, allowlisted coins)", () => {
+  const paperCfg = () => testConfig({
+    DRY_RUN: "false", MODE: "paper",
+    BEE1_ALPACA_API_KEY: "k1", BEE1_ALPACA_API_SECRET: "s1",
+    BEE2_ALPACA_API_KEY: "k2", BEE2_ALPACA_API_SECRET: "s2",
+    BEE3_ALPACA_API_KEY: "k3", BEE3_ALPACA_API_SECRET: "s3",
+  });
+  const paperCtx = (b: ReturnType<typeof bee>, v: ReturnType<typeof view>) => ctx("bizzy", b, v, paperCfg());
+  it("lets a long on an allowlisted coin through the venue gate", () => {
+    const r = run(paperCtx(bee("bizzy"), V), bizzy, prop(open("BTC-USD_UM_XPERP-310404", "long")));
+    expect(r.vetoedBy ?? "").not.toMatch(/venue_/);
+  });
+  it("vetoes shorts as venue_short", () => {
+    const r = run(paperCtx(bee("bizzy"), V), bizzy, prop(open("BTC-USD_UM_XPERP-310404", "short")));
+    expect(r.action).toEqual({ kind: "none" });
+    expect(r.vetoedBy).toMatch(/venue_short/);
+  });
+  it("vetoes non-allowlisted coins as venue_no_coin", () => {
+    const v2 = view([coin("FET", {}, 0.25)]);
+    const r = run(paperCtx(bee("bizzy"), v2), bizzy, prop(open("FET-USD_UM_XPERP-310404", "long")));
+    expect(r.action).toEqual({ kind: "none" });
+    expect(r.vetoedBy).toMatch(/venue_no_coin/);
+  });
+  it("dry mode is unaffected by venue gates", () => {
+    const r = run(ctx("bizzy", bee("bizzy"), V), bizzy, prop(open("BTC-USD_UM_XPERP-310404", "short")));
+    expect(r.vetoedBy ?? "").not.toMatch(/venue_/);
+  });
+});
