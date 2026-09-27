@@ -29,8 +29,13 @@ const SETTINGS_PATH = process.env.SETTINGS_PATH?.trim() || "./data/settings.json
 const REF_DIR = process.env.REF_DIR?.trim() || "./dashboard/public/bees";
 
 /** Names, rules, styles and pictures for the dashboard. */
-function profile(cfg: Config | null) {
-  return {
+/** Portrait URL for an official bee, keyed by wolf name (not style slot). Anything else falls back to style art. */
+const OFFICIAL_ART: Record<string, string> = { grim: "/bees/grim.jpg", blaze: "/bees/blaze.jpg", silver: "/bees/silver.jpg" };
+function officialArt(name: string, style: string): string {
+  return OFFICIAL_ART[name.trim().toLowerCase()] ?? `/bees/${style}.jpg`;
+}
+
+function profile(cfg: Config | null) {  return {
     setup: cfg === null,
     mode: cfg?.mode ?? "dry",
     links: cfg?.links ?? null,
@@ -45,9 +50,9 @@ function profile(cfg: Config | null) {
             styleLabel: STYLE_INFO[s.style].label,
             rules: s.rules,
             coins: s.coins,
-            // A Setup-made bee only ever shows its own portrait (null = the dashboard's placeholder mark), never the
-            // original bees' art, which belongs to the three official bees.
-            img: s.customImage && imagePath(cfg.settingsPath, id) ? `/bee-image/${id}` : s.fromSetup ? null : `/bees/${s.style}.jpg`,
+            // Official bees show their own portrait by name (names and art were once
+            // swapped between slots, so style-keyed URLs show the wrong wolf).
+            img: s.customImage && imagePath(cfg.settingsPath, id) ? `/bee-image/${id}` : s.fromSetup ? null : officialArt(s.name, s.style),
           };
         })
       : [],
