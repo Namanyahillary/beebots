@@ -48,12 +48,22 @@ describe("bizzy setups", () => {
 describe("bizzy breakout (one Larry Williams breakout a day)", () => {
   const lvl = { dayOpen: 100, prevRange: 4, trigger: 102 };
   it("offers BREAKOUT_<coin> only once price is through today's trigger, plus WAIT", () => {
-    const through = coin("SOL", { breakout: lvl }, 102.5);
+    const through = coin("SOL", { breakout: lvl }, 102.1);
     const below = coin("BTC", { breakout: { dayOpen: 100, prevRange: 4, trigger: 102 } }, 101);
     const m = bizzy.menu(ctx("bizzy", bee("bizzy"), view([through, below])));
     expect(m.BREAKOUT_SOL!.intent).toMatchObject({ kind: "open", side: "long", sizeFrac: 1 });
     expect(m.BREAKOUT_BTC).toBeUndefined();
     expect(m.WAIT).toBeDefined();
+  });
+  it("chase guard: an extended trigger is a missed breakout, not an entry (SOL specimen: -1.04% bled to the stop)", () => {
+    const chased = coin("SOL", { breakout: lvl }, 103.1); // (102-103.1)/103.1 = -1.07% past
+    const m = bizzy.menu(ctx("bizzy", bee("bizzy"), view([chased])));
+    expect(m.BREAKOUT_SOL).toBeUndefined();
+    expect(m.WAIT).toBeUndefined(); // nothing offerable: no question for Jev at all
+    const edge = coin("SOL", { breakout: lvl }, 102.2); // (102-102.2)/102.2 = -0.196% inside guard
+    const m2 = bizzy.menu(ctx("bizzy", bee("bizzy"), view([edge])));
+    expect(m2.BREAKOUT_SOL!.intent).toMatchObject({ kind: "open", side: "long" });
+    expect(m2.WAIT).toBeDefined();
   });
   it("nothing through its trigger = empty menu, so Jev is not asked", () => {
     const m = bizzy.menu(ctx("bizzy", bee("bizzy"), view([coin("SOL", { breakout: lvl }, 101)])));
@@ -192,7 +202,7 @@ describe("bizzy Stinger setup (prev-day-high + rising volume, challenger)", () =
     expect(stingerSetup(coin("SOL", { breakout: { dayOpen: 100, prevRange: 4, trigger: 102 }, volZ: 2 }, 103))).toBeNull(); // no prevHigh data
   });
   it("menu offers STINGER_ alongside BREAKOUT_ with separate labels for attribution", () => {
-    const s = coin("SOL", { breakout: hi, volZ: 1.5 }, 102.5);
+    const s = coin("SOL", { breakout: hi, volZ: 1.5 }, 102.1);
     const m = bizzy.menu(ctx("bizzy", bee("bizzy"), view([s])));
     expect(m.BREAKOUT_SOL).toBeDefined(); // through Williams trigger too
     expect(m.STINGER_SOL!.intent).toMatchObject({ kind: "open", side: "long", setup: "strict" });

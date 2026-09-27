@@ -73,6 +73,12 @@ function nearestOwn(ctx: BeeContext): { coin: string; pct: number; mid: number }
   return rows[0] ?? null;
 }
 
+/** Chase guard: a trigger more than this far past its line is a missed breakout, not an entry.
+ *  SOL specimen 2026-09-27 fired 104bp past trigger and bled -2.1% to the stop; three-desk
+ *  consensus (duel Q1-Q3) is market-take within the guard, never chase past it. Stinger is
+ *  exempt for now (already volume-gated; its extension is measured in menu labels, gated later). */
+export const BIZZY_MAX_CHASE_BPS = 20;
+
 export const bizzy: BeeBrain = {
   id: "bizzy",
   triggers: ["Williams breakout", "Stinger"],
@@ -140,7 +146,8 @@ export const bizzy: BeeBrain = {
       // Only coins that are through their trigger right now. Nothing triggered = no question for Jev (saves spend).
       for (const s of breakoutStats(ctx)) {
         const t = toTrigger(s);
-        if (t !== null && t <= 0) m[`BREAKOUT_${s.coin}`] = { desc: `through trigger by ${(-t).toFixed(2)}%`, intent: { kind: "open", instId: s.instId, side: "long", sizeFrac: 1, setup: "strict" } };
+        // Through the trigger but inside the chase guard: extended moves are missed breakouts.
+        if (t !== null && t <= 0 && t >= -BIZZY_MAX_CHASE_BPS / 100) m[`BREAKOUT_${s.coin}`] = { desc: `through trigger by ${(-t).toFixed(2)}%`, intent: { kind: "open", instId: s.instId, side: "long", sizeFrac: 1, setup: "strict" } };
         // Stinger challenger: previous day's high with rising volume. Separate
         // label so fills attribute Williams vs Stinger triggers against each other.
         const st = stingerSetup(s);
