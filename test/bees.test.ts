@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
+import { MARGIN_HEADROOM } from "../src/bees/common.js";
 import { bizzy, fadeSetup, stingerSetup } from "../src/bees/bizzy.js";
-import { boozy, rankCandidates } from "../src/bees/boozy.js";
+import { boozy, rankCandidates, switchTarget } from "../src/bees/boozy.js";
 import { breezy, breezySizeFrac } from "../src/bees/breezy.js";
 import { buildSnapshot } from "../src/snapshot.js";
 import { bee, coin, ctx, NOW, position, testConfig, trend, view } from "./fixtures.js";
@@ -94,7 +95,7 @@ describe("breezy", () => {
     const calm = coin("BTC", { trend: trend({ score: 9, rv90Pct: 20 }) });
     expect(breezySizeFrac(calm, ctx("breezy", b, view([calm])))).toBe(1);
     const wild = coin("BTC", { trend: trend({ score: 9, rv90Pct: 100 }) });
-    expect(breezySizeFrac(wild, ctx("breezy", b, view([wild])))).toBeCloseTo((333 * 0.6) / 666, 6);
+    expect(breezySizeFrac(wild, ctx("breezy", b, view([wild])))).toBeCloseTo((333 * 0.6) / (666 * MARGIN_HEADROOM), 6);
     const flat = coin("BTC", { trend: trend({ score: 0, rv90Pct: 50 }) });
     expect(breezySizeFrac(flat, ctx("breezy", b, view([flat])))).toBe(0.5);
     const weak = coin("BTC", { trend: trend({ score: 2, rv90Pct: 50 }) });
@@ -103,10 +104,10 @@ describe("breezy", () => {
   it("rebalances up when over 25% of max below target, not when near it or against the trend", () => {
     const s = coin("BTC", { trend: trend({ score: 9, rv90Pct: 20 }) }, 80000);
     const v = view([s]);
-    // one contract = $1 at the fixture price: 100 contracts = $100, target = $666
+    // one contract = $1 at the fixture price: 100 contracts = $100, target = max = $666 x MARGIN_HEADROOM
     const small = breezy.rebalance!(ctx("breezy", bee("breezy", { position: position(s, { contracts: 100 }), flatSince: null }), v));
     expect(small).toMatchObject({ kind: "add" });
-    expect(small!.sizeFrac).toBeCloseTo(566 / 666, 6);
+    expect(small!.sizeFrac).toBeCloseTo((666 * MARGIN_HEADROOM - 100) / (666 * MARGIN_HEADROOM), 6);
     expect(breezy.rebalance!(ctx("breezy", bee("breezy", { position: position(s, { contracts: 600 }), flatSince: null }), v))).toBeNull();
     expect(breezy.rebalance!(ctx("breezy", bee("breezy", { position: position(s, { contracts: 100, side: "short" }), flatSince: null }), v))).toBeNull();
   });
@@ -147,7 +148,8 @@ describe("boozy", () => {
     const young = boozy.menu(ctx("boozy", bee("boozy", { position: position(s, { openedAt: NOW - 23 * 60 * 60_000 }), flatSince: null }), v));
     expect(young.BAIL ?? young.SWITCH_COIN ?? young.FLIP_SHORT).toBeUndefined();
     expect(young.RIDE).toBeDefined();
-    const old = boozy.menu(ctx("boozy", bee("boozy", { position: position(s, { openedAt: NOW - 24 * 60 * 60_000 }), flatSince: null }), v));
+    // SWITCH_COIN also needs PEPE to have led the last two hourly checks (no switching on a stale ranking).
+    const old = boozy.menu(ctx("boozy", bee("boozy", { position: position(s, { openedAt: NOW - 24 * 60 * 60_000 }), flatSince: null, top1: { coin: "PEPE", streak: 2, rankedAt: NOW } }), v));
     expect(old.BAIL && old.SWITCH_COIN && old.FLIP_SHORT).toBeDefined();
   });
   it("DOUBLE_DOWN only after another 1 ATR(1h) run past the entry", () => {
@@ -242,10 +244,10 @@ describe("boozy risk-normalized entries (1.5% risk per stopped-out entry)", () =
   };
   const open = { kind: "open" as const, instId: "", side: "long" as const, sizeFrac: 0.5, setup: "strict" as const };
   it("wide stop shrinks the entry (AERO case: 7.2% stop on $333)", () => {
-    // atr14Pct 1.2 → atr1h 2.4% → 3x trail = 7.2% stop; max = min(2*333, 700) = 666.
+    // atr14Pct 1.2 → atr1h 2.4% → 3x trail = 7.2% stop; max = min(2*333, 700) x MARGIN_HEADROOM.
     const { c, s } = mk(1, 1.2);
     const f = boozy.sizeFrac({ ...open, instId: s.instId }, 3, c);
-    expect(f).toBeCloseTo((0.015 * 333) / (0.072 * 666), 3);
+    expect(f).toBeCloseTo((0.015 * 333) / (0.072 * 666 * MARGIN_HEADROOM), 3);
     expect(f).toBeLessThan(0.5);
   });
   it("narrow stop caps at full size, unknown stop passes through", () => {
@@ -266,5 +268,68 @@ describe("boozy spike challenger (volume spike + push-up, label-only)", () => {
     expect(spikeSetup(coin("DOGE", { volZ: 0.5, ret1hPct: 1.2 }, 1))).toBeNull();
     expect(spikeSetup(coin("DOGE", { volZ: 2.5, ret1hPct: -0.5 }, 1))).toBeNull();
     expect(spikeSetup(coin("DOGE", { volZ: null, ret1hPct: 1.2 }, 1))).toBeNull();
+  });
+});
+
+describe("boozy: a switch needs a confirmed outrank", () => {
+  // ENA held; SUI has stronger momentum, so it ranks first.
+  const ena = coin("ENA", { ret24hPct: 5, ret7dPct: 20 });
+  const sui = coin("SUI", { ret24hPct: 12, ret7dPct: 40 });
+  const unlocked = (top1: { coin: string | null; streak: number }, stats = [ena, sui]) => {
+    const b = bee("boozy", { position: position(ena, { openedAt: NOW - 25 * 60 * 60_000 }), flatSince: null, top1: { ...top1, rankedAt: NOW } });
+    return ctx("boozy", b, view(stats));
+  };
+
+  it("offered when the other coin leads now and led the last two hourly checks", () => {
+    const c = unlocked({ coin: "SUI", streak: 2 });
+    expect(rankCandidates(c.view, c.knobs.spreadGateBps)[0]!.s.coin).toBe("SUI");
+    expect(boozy.menu(c).SWITCH_COIN?.intent).toMatchObject({ kind: "switch", instId: sui.instId });
+  });
+
+  it("not offered on a single check", () => {
+    expect(boozy.menu(unlocked({ coin: "SUI", streak: 1 })).SWITCH_COIN).toBeUndefined();
+  });
+
+  it("not offered while the held coin is still #1, whatever the hourly history says", () => {
+    const strongEna = coin("ENA", { ret24hPct: 25, ret7dPct: 43 });
+    expect(boozy.menu(unlocked({ coin: "SUI", streak: 3 }, [strongEna, sui])).SWITCH_COIN).toBeUndefined();
+  });
+
+  it("not offered when the held coin is out of the ranking (spread gate), since there is no fair comparison", () => {
+    const wide = coin("ENA", { ret24hPct: 5, ret7dPct: 20, spreadBp: 27 });
+    const c = unlocked({ coin: "SUI", streak: 2 }, [wide, sui]);
+    expect(switchTarget(c, rankCandidates(c.view, c.knobs.spreadGateBps))).toBeNull();
+    expect(boozy.menu(c).SWITCH_COIN).toBeUndefined();
+    expect(boozy.menu(c).BAIL).toBeDefined(); // bailing stays Jev's call
+  });
+
+  it("the streak belongs to one challenger: a different leader starts from zero", () => {
+    expect(boozy.menu(unlocked({ coin: "DOGE", streak: 5 })).SWITCH_COIN).toBeUndefined();
+  });
+});
+
+describe("entry-stop backfill re-sizes R once", () => {
+  it("an old position without initialStopPx is anchored to its entry stop; a trailed-past-entry one is left alone", async () => {
+    const { Db } = await import("../src/db.js");
+    const { EventBus } = await import("../src/events.js");
+    const { SimExecutor } = await import("../src/exec/executor.js");
+    const { Engine } = await import("../src/engine.js");
+    const { Alerts } = await import("../src/alerts.js");
+    const cfg = testConfig();
+    const s = coin("ENA", { ret24hPct: 25, ret7dPct: 43 });
+    const V = view([s]);
+    const feed = { view: () => V, lastRefreshAt: NOW } as never;
+    const db = new Db(":memory:");
+    const engine = new Engine({ cfg, db, feed, jev: null as never, exec: new SimExecutor(() => V, 0), bus: new EventBus(db), alerts: new Alerts(undefined), now: () => NOW });
+    type E = { bees: Record<string, ReturnType<typeof bee>>; markBee(id: string, now: number): void };
+    const e = engine as unknown as E;
+    const ctVal = V.instruments.get(s.instId)!.ctVal;
+    e.bees["bee3"] = bee("boozy", { position: position(s, { contracts: 21, entryPx: 100, stopPx: 90, riskUsd: 1 }) });
+    e.markBee("bee3", NOW);
+    expect(e.bees["bee3"]!.position).toMatchObject({ initialStopPx: 90 });
+    expect(e.bees["bee3"]!.position!.riskUsd).toBeCloseTo(21 * ctVal * 10, 6);
+    e.bees["bee3"] = bee("boozy", { position: position(s, { contracts: 21, entryPx: 95, stopPx: 96, riskUsd: 7 }) });
+    e.markBee("bee3", NOW);
+    expect(e.bees["bee3"]!.position).toMatchObject({ initialStopPx: null, riskUsd: 7 });
   });
 });

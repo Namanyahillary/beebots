@@ -5,16 +5,38 @@ import { scoutAge } from "./Scout";
 import { TradeModal } from "./TradeModal";
 import { BEE_META, type DecisionEvent, type FillEvent } from "./types";
 
-const FillRow = memo(function FillRow({ fill, onOpen }: { fill: FillEvent; onOpen: () => void }) {
+const money = (x: number, d = 2) => `${x < 0 ? "−" : ""}$${Math.abs(x).toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d })}`;
+const signed = (x: number, d = 2) => `${x >= 0 ? "+" : "−"}$${Math.abs(x).toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d })}`;
+
+export const FillRow = memo(function FillRow({
+  fill,
+  hideBee = false,
+  onOpen,
+}: {
+  fill: FillEvent;
+  hideBee?: boolean;
+  onOpen: () => void;
+}) {
   const meta = BEE_META[fill.bee];
+  const closing = (fill.purpose !== "open" && fill.purpose !== "add") || fill.realisedUsd !== 0;
+  const net = fill.realisedUsd - fill.feeUsd;
+
   return (
-    <button type="button" className="fill-row" style={{ ["--bee" as string]: meta.color }} onClick={onOpen}>
-      <span className="fill-bee">{meta.short}</span>
-      <span className="fill-main">
-        {fill.side === "buy" ? "▲" : "▼"} {fill.coin} <span className="dim">×{fill.contracts}</span>
-      </span>
+    <button
+      type="button"
+      className={`fill-row${hideBee ? " no-bee" : ""}`}
+      style={{ ["--bee" as string]: meta.color }}
+      onClick={onOpen}
+      title={`${meta.short} ${fill.side.toUpperCase()} ${fill.coin} · ${fill.purpose} · ${fill.contracts} contracts @ $${fill.px} · Fee: ${money(fill.feeUsd)}`}
+    >
+      {!hideBee && <span className="fill-bee">{meta.short}</span>}
+      <span className={`fill-side ${fill.side}`}>{fill.side.toUpperCase()}</span>
+      <span className="fill-coin">{fill.coin}</span>
       <span className="fill-purpose dim">{fill.purpose}</span>
-      <span className="dim">{scoutAge(fill.ts, Date.now())}</span>
+      <span className={`fill-pnl num ${closing ? (net >= 0 ? "good" : "bad") : "dim"}`}>
+        {closing ? signed(net) : money(fill.notionalUsd, 0)}
+      </span>
+      <span className="fill-time dim num">{scoutAge(fill.ts, Date.now())}</span>
     </button>
   );
 });

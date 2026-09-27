@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { EquityChart } from "./EquityChart";
 import { Help } from "./Help";
-import { scoutAge } from "./Scout";
+import { FillRow } from "./Fills";
 import { TradeModal } from "./TradeModal";
 import { BEE_META, type BeeName, type DecisionEvent, type FillEvent, type PublicBee } from "./types";
 import type { Curve, FeedState } from "./useFeed";
@@ -346,19 +346,12 @@ export function BeeColumn({ name, bee, curve, baseline, rank, gap, flash, fills,
             {beeFills.length > 0 ? (
               <div className="fills-list bee-fills-list">
                 {beeFills.map((f) => (
-                  <button
+                  <FillRow
                     key={`${f.ts}-${f.bee}-${f.coin}-${f.contracts}-${f.px}`}
-                    type="button"
-                    className="fill-row"
-                    style={{ ["--bee" as string]: meta.color }}
-                    onClick={() => setSel(f)}
-                  >
-                    <span className="fill-main">
-                      {f.side === "buy" ? "▲" : "▼"} {f.coin} <span className="dim">×{f.contracts}</span>
-                    </span>
-                    <span className="fill-purpose dim">{f.purpose}</span>
-                    <span className="dim">{scoutAge(f.ts, Date.now())}</span>
-                  </button>
+                    fill={f}
+                    hideBee
+                    onOpen={() => setSel(f)}
+                  />
                 ))}
               </div>
             ) : (

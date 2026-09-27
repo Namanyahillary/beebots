@@ -54,10 +54,12 @@ export function applyFill(bee: BeeState, f: LedgerFill): number {
   if (p.instId !== f.instId) throw new Error(`fill for ${f.coin} while holding ${p.coin}`);
   const pDir = p.side === "long" ? 1 : -1;
   if (dir === pDir) {
-    // add: weighted average entry, scale risk up proportionally so uplR (= upl/riskUsd) stays correct.
+    // add: weighted average entry, and 1R grows with size from the entry stop (not the trailed one).
     const total = p.contracts + f.contracts;
     p.entryPx = (p.entryPx * p.contracts + f.px * f.contracts) / total;
-    if (p.contracts > 0) p.riskUsd = (p.riskUsd * total) / p.contracts;
+    const initStop = p.initialStopPx ?? p.stopPx;
+    if (initStop !== null && initStop !== undefined) p.riskUsd = sizedRiskUsd(total, f.ctVal, p.entryPx, initStop);
+    else if (p.contracts > 0) p.riskUsd = (p.riskUsd * total) / p.contracts;
     p.contracts = total;
     return 0;
   }
@@ -117,4 +119,9 @@ export function rollDay(bee: BeeState, now: number): boolean {
   bee.feesTodayUsd = 0;
   if (bee.cap !== "retired") bee.cap = null;
   return true;
+}
+
+/** USD lost if the whole position exits at `stopPx` from its average entry. */
+export function sizedRiskUsd(contracts: number, ctVal: number, entryPx: number, stopPx: number): number {
+  return Math.abs(contracts * ctVal * (entryPx - stopPx));
 }

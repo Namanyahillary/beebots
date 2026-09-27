@@ -173,7 +173,7 @@ describe("bizzy: waits for her breakout", () => {
 
   it("takes the breakout at full size (2x)", () => {
     const r = run(ctx("bizzy", bee("bizzy"), V), bizzy, prop(open(SOL.instId, "long", "strict", 1)));
-    expect(r.action).toMatchObject({ kind: "open", notionalUsd: 666 });
+    expect(r.action).toMatchObject({ kind: "open", notionalUsd: 666 * 0.97 });
   });
 });
 
@@ -205,7 +205,7 @@ describe("breezy: open gate and never flat", () => {
   });
 
   it("a weak flip while positioned becomes HOLD", () => {
-    // $400 position: already at target size (5/9 of $666), so no rebalance either.
+    // $400 position: already at target size (5/9 of max), so no rebalance either.
     const b = bee("breezy", { position: position(BTC, { contracts: 400 }), flatSince: null });
     const r = run(ctx("breezy", b, V), breezy, prop({ kind: "switch", instId: BTC.instId, side: "short", sizeFrac: 0.5, setup: "loose" }, 0.6, 1));
     expect(r.action.kind).toBe("none");
@@ -237,7 +237,7 @@ describe("breezy: code keeps her at target size", () => {
     const r = run(ctx("breezy", b, view([BTC])), breezy, prop({ kind: "hold" }));
     expect(r.forcedBy).toBe("rebalance");
     expect(r.action).toMatchObject({ kind: "add" });
-    expect((r.action as { notionalUsd: number }).notionalUsd).toBeCloseTo(656, 5);
+    expect((r.action as { notionalUsd: number }).notionalUsd).toBeCloseTo(666 * 0.97 - 10, 5);
   });
   it("no rebalance while benched", () => {
     const BTC = coin("BTC", { trend: trend({ score: 9, rv90Pct: 20 }) }, 80000);
@@ -256,7 +256,7 @@ describe("boozy: always holding something", () => {
 
   it("the forced ape is risk-normalized (1.5% stop risk), not 1x equity", () => {
     const r = run(ctx("boozy", bee("boozy", { flatSince: NOW - 2000 }), V), boozy, null, "no_options");
-    // SOL fixture: 3% stop distance → 0.015*333/(0.03*666) = 0.25 of $666 max.
+    // SOL fixture: 3% stop distance → 0.015*333/(0.03*max) = 0.25 of max.
     expect((r.action as { notionalUsd: number }).notionalUsd).toBeCloseTo(166.5, 5);
   });
 
@@ -313,7 +313,7 @@ describe("size cap: 2x and the absolute ceiling", () => {
   it("double-down is capped at the room left under max", () => {
     const b = bee("boozy", { position: position(SOL, { contracts: 500 }), flatSince: null }); // 500 contracts x $1 = $500
     const r = run(ctx("boozy", b, V), boozy, prop({ kind: "add", sizeFrac: 1 }));
-    expect((r.action as { notionalUsd: number }).notionalUsd).toBeCloseTo(166, 5);
+    expect((r.action as { notionalUsd: number }).notionalUsd).toBeCloseTo(666 * 0.97 - 500, 5);
   });
 
   it("vetoes an order below the instrument minimum", () => {

@@ -335,3 +335,40 @@ describe("applyProfitLock (bank gains, never round-trip to loss)", () => {
     expect(b.position!.peakUplUsd).toBe(1);
   });
 });
+
+describe("protectAdds: an add can never turn a winner into a loser", () => {
+  it("stop ratchets to at least the new average entry after a filled add", async () => {
+    const { Db } = await import("../src/db.js");
+    const { EventBus } = await import("../src/events.js");
+    const { SimExecutor } = await import("../src/exec/executor.js");
+    const { Engine } = await import("../src/engine.js");
+    const { Jev } = await import("../src/jev.js");
+    const { Alerts } = await import("../src/alerts.js");
+    const cfg = testConfig();
+    const db = new Db(":memory:");
+    const bus = new EventBus(db);
+    const s = coin("PENGU", {}, 100);
+    const V = view([s]);
+    const feed = { view: () => V, lastRefreshAt: NOW } as never;
+    const answers = {
+      action: { type: "choice", choice: "DOUBLE_DOWN", confidence: 1, probabilities: { DOUBLE_DOWN: 1 } },
+      conviction: { type: "score", score: 3, confidence: 0.5, legend: {}, probabilities: {} },
+    };
+    const jev = new Jev({
+      apiKey: "k", model: "m", timeoutMs: 2000, dailyUsdCap: 5, usdPerMTok: 0.042,
+      client: { async systemOne() { return { model: "m", usage: { input_tokens: 100, output_tokens: 0 }, answers } as never; } },
+      now: () => NOW,
+    });
+    const exec = new SimExecutor(() => ({ tickers: V.tickers, instruments: V.instruments }), 0.0005, () => NOW);
+    const engine = new Engine({ cfg, db, feed, jev, exec, bus, alerts: new Alerts(undefined), now: () => NOW });
+    const b = bee("boozy", { uplUsd: 0, flatSince: null });
+    b.position = position(s, { contracts: 333, entryPx: 98.9, riskUsd: 10, stopPx: null });
+    engine.bees["bee3"] = b;
+    type E = { decide(id: string, now: number): Promise<void> };
+    await (engine as unknown as E).decide("bee3", NOW);
+    const p = b.position!;
+    expect(p.contracts).toBeGreaterThan(333); // the add filled
+    expect(p.stopPx).toBeCloseTo(p.entryPx, 6); // stop lifted to the new average entry
+    expect(p.stopPx).toBeGreaterThan(98.9);
+  });
+});

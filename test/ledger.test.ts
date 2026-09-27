@@ -102,3 +102,26 @@ describe("ledger", () => {
     expect(r.cap).toBe("retired");
   });
 });
+
+describe("R exactness (initialStopPx anchor)", () => {
+  const g = (side: "buy" | "sell", contracts: number, px: number) => ({ instId: "SOL-USD_UM_XPERP-310404", coin: "SOL", side, contracts, px, feeUsd: 0, ctVal: 1, ts: NOW });
+  it("re-sizes 1R from the averaged entry and the entry stop on adds", async () => {
+    const { sizedRiskUsd } = await import("../src/ledger.js");
+    const b = freshBee("bee1", 333, NOW);
+    applyFill(b, g("buy", 100, 100));
+    b.position!.stopPx = 99;
+    b.position!.initialStopPx = 99;
+    b.position!.riskUsd = 100;
+    applyFill(b, g("buy", 100, 110)); // avg entry 105, stop still 99
+    expect(b.position!.entryPx).toBeCloseTo(105, 10);
+    expect(b.position!.riskUsd).toBeCloseTo(sizedRiskUsd(200, 1, 105, 99), 10);
+    expect(b.position!.riskUsd).toBeCloseTo(1200, 10); // exact, not proportionally-scaled 200
+  });
+  it("falls back to proportional scaling without an anchor", () => {
+    const b = freshBee("bee1", 333, NOW);
+    applyFill(b, g("buy", 100, 100));
+    b.position!.riskUsd = 100;
+    applyFill(b, g("buy", 100, 110));
+    expect(b.position!.riskUsd).toBeCloseTo(200, 10);
+  });
+});

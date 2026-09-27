@@ -9,7 +9,7 @@ import type { EventBus } from "./events.js";
 import type { Executor } from "./exec/executor.js";
 import { contractsFor, roundToLot } from "./exec/sizing.js";
 import type { Jev, JevResult } from "./jev.js";
-import { applyFill, applyFunding, freshBee, mark, rollDay } from "./ledger.js";
+import { applyFill, applyFunding, freshBee, mark, rollDay, sizedRiskUsd } from "./ledger.js";
 import { planStaged, settleStaged, stageTick, type StagedPlan } from "./ghostStage.js";
 import { log } from "./log.js";
 import type { MarketFeed } from "./market/data.js";
@@ -24,6 +24,8 @@ const FUNDING_HOURS_UTC = [0, 8, 16];
 const RECON_MS = 5 * 60_000;
 /** How often a benched bee gets a live P&L row in the stream. */
 const PULSE_MS = 4_000;
+/** How long a bee opens nothing after the venue rejects one of its new orders. */
+export const ORDER_REJECT_PAUSE_MS = 10 * 60_000;
 const EQUITY_SNAPSHOT_MS = 10_000;
 /** Ghost benchmark + liq-proxy sampling: one row per bee every Nth tick. */
 export const GHOST_EVERY_TICKS = 6;
@@ -256,6 +258,12 @@ interface LastDecision {
   idle: IdleDetail | null;
 }
 
+/** Move a stop only in the position's favour. */
+function ratchetStop(p: Position, cand: number): void {
+  if (p.stopPx === null) p.stopPx = cand;
+  else p.stopPx = p.side === "long" ? Math.max(p.stopPx, cand) : Math.min(p.stopPx, cand);
+}
+
 export class Engine {
   readonly bees = {} as Record<BeeId, BeeState>;
   private last = {} as Partial<Record<BeeId, LastDecision>>;
@@ -285,6 +293,8 @@ export class Engine {
   private liqMax = {} as Partial<Record<BeeId, number>>;
   private liqLast = {} as Partial<Record<BeeId, number | null>>;
   private recon: { ok: boolean | null; detail: string; ts: number } = { ok: null, detail: "not run yet", ts: 0 };
+  /** Until when a bee opens nothing after a venue rejection (closes never pause). */
+  private orderPauseUntil = {} as Partial<Record<BeeId, number>>;
   /** Staged-entry ghost plans (bizzy only, measurement — never executes). Lost on restart by design. */
   private stagedPlans = {} as Partial<Record<BeeId, StagedPlan>>;
   private liveStartedAt: number | null = null;
@@ -463,6 +473,14 @@ export class Engine {
     const p = bee.position;
     const t = p ? view.tickers.get(p.instId) : undefined;
     mark(bee, t?.mid, p ? view.instruments.get(p.instId)?.ctVal : undefined);
+    // Positions opened before initialStopPx existed: their stop has never trailed past entry, so it is the entry stop.
+    // Re-size R once from it (adds used to scale the first fill's risk approximately).
+    const ctVal = p ? view.instruments.get(p.instId)?.ctVal : undefined;
+    if (p && p.initialStopPx === undefined && p.stopPx !== null && ctVal) {
+      const lossSide = p.side === "long" ? p.stopPx < p.entryPx : p.stopPx > p.entryPx;
+      p.initialStopPx = lossSide ? p.stopPx : null;
+      if (lossSide) p.riskUsd = sizedRiskUsd(p.contracts, ctVal, p.entryPx, p.stopPx);
+    }
     // Staged-entry ghost tick: feed the shadow Grim's live mids (measurement only).
     const staged = this.stagedPlans[id];
     if (staged && p && t?.mid !== undefined && t.mid !== null) {
@@ -962,6 +980,7 @@ private filterVenueMenu(menu: Menu, coins: string[]): Menu {
       const ctx = this.ctx(id, this.now());
       const inst = ctx.view.instruments.get(last.instId);
       p.stopPx = this.brain(id).stopFor(last.instId, p.side, p.entryPx, ctx);
+      p.initialStopPx = p.stopPx;
       const notional = inst ? positionNotional(p, p.entryPx, inst.ctVal) : 0;
       p.riskUsd = p.stopPx !== null ? (notional * Math.abs(p.entryPx - p.stopPx)) / p.entryPx : notional * 0.01;
       this.d.db.saveBee(bee, now);
@@ -1027,8 +1046,12 @@ private filterVenueMenu(menu: Menu, coins: string[]): Menu {
         const inst = ctx.view.instruments.get(p.instId);
         const s = ctx.view.stats.get(p.instId);
         const n = inst && s ? contractsFor(action.notionalUsd, inst, s.mid) : 0;
-        if (n > 0) await this.order(id, decisionId, p.instId, p.side === "long" ? "buy" : "sell", n, false, "add");
-        else log.info("add rounds to zero contracts, skipped", { bee: id });
+        if (n > 0) {
+          const ok = await this.order(id, decisionId, p.instId, p.side === "long" ? "buy" : "sell", n, false, "add");
+          const q = this.bees[id].position;
+          // An add raises the average entry; don't let it turn the position into a loser: stop to at least the new average.
+          if (ok && q && this.brain(id).protectAdds) ratchetStop(q, q.entryPx);
+        } else log.info("add rounds to zero contracts, skipped", { bee: id });
         return;
       }
       case "switch":
@@ -1072,6 +1095,7 @@ private filterVenueMenu(menu: Menu, coins: string[]): Menu {
     const ctx = this.ctx(id, this.now());
     const p = bee.position;
     p.stopPx = this.brain(id).stopFor(instId, side, p.entryPx, ctx);
+    p.initialStopPx = p.stopPx;
     const notional = positionNotional(p, p.entryPx, inst.ctVal);
     p.riskUsd = p.stopPx !== null ? (notional * Math.abs(p.entryPx - p.stopPx)) / p.entryPx : notional * 0.01;
     if (s.trend) p.entryScore = s.trend.score;
@@ -1083,6 +1107,12 @@ private filterVenueMenu(menu: Menu, coins: string[]): Menu {
     const now = this.now();
     const inst = this.d.feed.view().instruments.get(instId);
     if (!inst) return false;
+    // After the venue rejects a new order, this bee opens nothing for ORDER_REJECT_PAUSE_MS (it used to
+    // resend every tick: 98 orders in 40 minutes upstream). Closes (reduceOnly) are never paused: stops must try.
+    if (!reduceOnly && now < (this.orderPauseUntil[id] ?? 0)) {
+      log.info("new orders paused after a venue rejection", { bee: id, coin: inst.coin, purpose, untilS: Math.round(((this.orderPauseUntil[id] ?? 0) - now) / 1000) });
+      return false;
+    }
     const clOrdId = `${id.slice(0, 2)}${now.toString(36)}${(this.seq++ % 1296).toString(36).padStart(2, "0")}`;
     const orderId = db.insertOrder({ decisionId, bee: id, ts: now, clOrdId, instId, side, contracts, reduceOnly, purpose });
     bus.emit("order", { bee: id, coin: inst.coin, side, contracts, purpose, clOrdId, state: "sent" }, now);
@@ -1092,6 +1122,10 @@ private filterVenueMenu(menu: Menu, coins: string[]): Menu {
       bus.emit("order", { bee: id, coin: inst.coin, side, contracts, purpose, state: res.state, error: res.error });
       log.warn("order failed", { bee: id, coin: inst.coin, purpose, err: res.error });
       if (res.state === "unknown") this.lastReconAt = 0; // reconcile on the next tick
+      if (!reduceOnly) {
+        this.orderPauseUntil[id] = now + ORDER_REJECT_PAUSE_MS;
+        this.d.alerts.send(`${this.d.cfg.slots[id].name}: ${inst.coin} ${purpose} order rejected (${res.error.code} ${res.error.message}); new orders paused ${ORDER_REJECT_PAUSE_MS / 60_000} min`);
+      }
       return false;
     }
     db.updateOrder(orderId, "filled", res.ordId, null);
@@ -1229,6 +1263,9 @@ private filterVenueMenu(menu: Menu, coins: string[]): Menu {
             beMoved: keepFlags ? (ours!.beMoved ?? false) : false,
             peakUplUsd: keepFlags ? (ours!.peakUplUsd ?? null) : null,
           };
+          const np = bee.position;
+          np.initialStopPx = keepStop !== null && ours ? (ours.initialStopPx ?? ours.stopPx) : np.stopPx;
+          if (inst && np.initialStopPx !== null && np.initialStopPx !== undefined) np.riskUsd = sizedRiskUsd(np.contracts, inst.ctVal, np.entryPx, np.initialStopPx);
           bee.flatSince = null;
         }
       }

@@ -163,3 +163,16 @@ Fixed-dollar activation ($2) was wrong: it over-triggers on small trades and
 under-triggers on large ones. Activation is now 2% of entry notional ($55 trade
 activates near $1.10, $330 near $6.60). Giveback stays 10% of peak. Breakeven
 (first priority — BE-move at +1R on boozy) is unchanged and fires before any lock.
+
+## Upstream adoptions (2026-09-27, adversarially reviewed)
+
+Five commits since fork `1d6c28f` assessed against this branch. Adopted: reject-pause
+(10min after any failed open, closes exempt — same spam hole existed here, now venue-neutral
+for Alpaca too), switchTarget gating (streak>=2, no first-print rotations), R exactness
+(sizedRiskUsd + initialStopPx anchor; note: our proportional scaling was already close —
+this buys exactness, not a rescue), MARGIN_HEADROOM 0.97 (3% haircut, ghost-consistent),
+protectAdds (stop >= avg entry after adds), parseCliError messages, at_stop_usd into JEV
+state, Setup styleNote. Left out deliberately: upstream profit-lock rungs (rival to our
+90%-trail — ghost-duel it, don't stack), requiredAnswer generalization (our lockedHold +
+skip accounting stays until a manual port preserves the metrics), "X Bee" titles
+(conflicts with Grim/Blaze rename — needs owner taste call).

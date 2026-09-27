@@ -1199,25 +1199,42 @@ body,
   display: flex;
   flex-direction: column;
   gap: 0.35rem;
-  max-height: 15rem;
-  overflow: hidden;
+  max-height: 16rem;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line) transparent;
+}
+.fills-list::-webkit-scrollbar {
+  width: 4px;
+}
+.fills-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+.fills-list::-webkit-scrollbar-thumb {
+  background: var(--line);
+  border-radius: 4px;
 }
 .fill-row {
   display: grid;
-  grid-template-columns: 3.4rem 1fr auto auto;
-  gap: 0.6rem;
-  align-items: baseline;
+  grid-template-columns: 3.2rem auto auto 1fr auto auto;
+  gap: 0.45rem;
+  align-items: center;
   width: 100%;
   font: inherit;
-  font-size: 0.82rem;
+  font-size: 0.8rem;
   text-align: left;
   color: var(--text);
   background: var(--card-2);
   border: 0;
   border-left: 3px solid var(--bee);
   border-radius: 0 0.5rem 0.5rem 0;
-  padding: 0.4rem 0.6rem;
+  padding: 0.35rem 0.55rem;
   cursor: pointer;
+  transition: background 0.15s;
+}
+.fill-row.no-bee {
+  grid-template-columns: auto auto 1fr auto auto;
 }
 .fill-row:hover {
   background: color-mix(in srgb, var(--bee) 16%, var(--card-2));
@@ -1225,18 +1242,55 @@ body,
 .fill-bee {
   font-weight: 700;
   color: var(--text-2);
-}
-.fill-main {
-  font-family: "JetBrains Mono", ui-monospace, monospace;
-  font-weight: 700;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+.fill-side {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  padding: 0.1rem 0.32rem;
+  border-radius: 0.25rem;
+  line-height: 1;
+  text-align: center;
+  white-space: nowrap;
+}
+.fill-side.buy {
+  color: var(--good-text);
+  background: rgba(22, 163, 74, 0.16);
+  border: 1px solid rgba(74, 222, 128, 0.3);
+}
+.fill-side.sell {
+  color: var(--critical-text);
+  background: rgba(185, 28, 28, 0.16);
+  border: 1px solid rgba(255, 85, 85, 0.3);
+}
+.fill-coin {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-weight: 800;
+  color: var(--text);
+  white-space: nowrap;
 }
 .fill-purpose {
+  font-size: 0.74rem;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  color: var(--muted);
+}
+.fill-pnl {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-weight: 700;
+  font-size: 0.78rem;
+  text-align: right;
+  white-space: nowrap;
+}
+.fill-time {
+  text-align: right;
+  white-space: nowrap;
+  font-size: 0.74rem;
 }
 
 /* ---------- trade modal ---------- */
@@ -1773,6 +1827,12 @@ textarea.setup-input {
 .setup-err {
   color: var(--critical-text) !important;
 }
+.setup-note {
+  color: var(--muted) !important;
+  border-left: 3px solid var(--bee, var(--muted));
+  padding-left: 10px;
+  margin: 6px 0 0 !important;
+}
 .setup-foot {
   margin-top: 24px !important;
   text-align: center;
@@ -1875,8 +1935,7 @@ textarea.setup-input {
   background: rgba(255, 255, 255, 0.03);
   border-left: 3px solid var(--bee);
   border-radius: 6px;
-  padding: 8px 10px;
-  margin: 4px 0;
+  padding: 8px 10px;  margin: 4px 0;
 }
 .setup-hint {
   margin-right: auto;
@@ -2018,7 +2077,7 @@ textarea.setup-input {
   overflow-y: auto;
 }
 .bee-fills-list .fill-row {
-  grid-template-columns: 1fr auto auto;
+  grid-template-columns: auto auto 1fr auto auto;
 }
 .collapse-btn {
   margin-left: auto;
