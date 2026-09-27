@@ -91,7 +91,7 @@ function TriggerBadge({ label }: { label: string }) {
             </button>
             <h2 id="stinger-title">Stinger entry trigger</h2>
             <div className="help-body">
-              <p>Stinger is Blaze second entry trigger, alongside the default Williams breakout.</p>
+              <p>Stinger is Grim second entry trigger, alongside the default Williams breakout.</p>
               <dl>
                 <dt>Rule</dt>
                 <dd>Long only when price sits above the previous day high with rising volume.</dd>

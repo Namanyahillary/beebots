@@ -13,7 +13,7 @@ export const STYLE_INFO: Record<StyleId, { label: string; blurb: string; name: s
   bizzy: {
     label: "Breakout",
     blurb: "One volatility breakout a day on BTC, ETH, SOL or HYPE, ridden to the daily close. Patient, then all in.",
-    name: "Blaze",
+    name: "Grim",
     tagline: "the grinder",
   },
   breezy: {
@@ -25,7 +25,7 @@ export const STYLE_INFO: Record<StyleId, { label: string; blurb: string; name: s
   boozy: {
     label: "Momentum",
     blurb: "Chases the strongest 7-day mover across every liquid coin, and adds to winners. Big swings, strange coins.",
-    name: "Grim",
+    name: "Blaze",
     tagline: "the degen",
   },
 };

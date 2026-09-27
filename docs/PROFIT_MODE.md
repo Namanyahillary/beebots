@@ -150,7 +150,7 @@ winners, usually behind a breakeven stop). Fee drag on tiny notionals is the wat
 item, measured not gated. TP/BE triggers gain meaning automatically: riskUsd now
 approximates the budget by construction.
 
-## Profit-lock trail + Grim frequency (shipped)
+## Profit-lock trail + Blaze frequency (shipped)
 Profit-lock: once peak unrealised passes $2 (activation floor against noise exits),
 the stop keeps 90% of peak (boozy only; BE/ATR-trail reconciled by max). A +$5 run
 that fades exits near +$4.50, never round-trips to breakeven. peakUplUsd persists

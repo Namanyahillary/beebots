@@ -46,9 +46,9 @@ describe("config", () => {
 
   it("with no Setup file the bees are the original three", () => {
     const c = loadConfig({ TYPESAFE_API_KEY: "k" });
-    expect(c.slots.bee1).toMatchObject({ style: "bizzy", name: "Blaze", customImage: false });
+    expect(c.slots.bee1).toMatchObject({ style: "bizzy", name: "Grim", customImage: false });
     expect(c.slots.bee2).toMatchObject({ style: "breezy", name: "Silver" });
-    expect(c.slots.bee3).toMatchObject({ style: "boozy", name: "Grim" });
+    expect(c.slots.bee3).toMatchObject({ style: "boozy", name: "Blaze" });
   });
 
   it("a Setup file supplies the Jev key and the bees; the environment still wins", () => {
