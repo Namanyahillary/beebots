@@ -10,6 +10,7 @@ import type { Executor } from "./exec/executor.js";
 import { contractsFor, roundToLot } from "./exec/sizing.js";
 import type { Jev, JevResult } from "./jev.js";
 import { applyFill, applyFunding, freshBee, mark, rollDay } from "./ledger.js";
+import { planStaged, settleStaged, stageTick, type StagedPlan } from "./ghostStage.js";
 import { log } from "./log.js";
 import type { MarketFeed } from "./market/data.js";
 import type { MarketView } from "./market/types.js";
@@ -284,6 +285,8 @@ export class Engine {
   private liqMax = {} as Partial<Record<BeeId, number>>;
   private liqLast = {} as Partial<Record<BeeId, number | null>>;
   private recon: { ok: boolean | null; detail: string; ts: number } = { ok: null, detail: "not run yet", ts: 0 };
+  /** Staged-entry ghost plans (bizzy only, measurement — never executes). Lost on restart by design. */
+  private stagedPlans = {} as Partial<Record<BeeId, StagedPlan>>;
   private liveStartedAt: number | null = null;
   private lastPulseAt: Partial<Record<BeeId, number>> = {};
   private lastChipUsd: Partial<Record<BeeId, number>> = {};
@@ -460,6 +463,21 @@ export class Engine {
     const p = bee.position;
     const t = p ? view.tickers.get(p.instId) : undefined;
     mark(bee, t?.mid, p ? view.instruments.get(p.instId)?.ctVal : undefined);
+    // Staged-entry ghost tick: feed the shadow Grim's live mids (measurement only).
+    const staged = this.stagedPlans[id];
+    if (staged && p && t?.mid !== undefined && t.mid !== null) {
+      const ev = stageTick(staged, t.mid, now);
+      if (ev !== "waiting") {
+        this.d.db.insertGhostDecision({
+          bee: id, ts: now, choice: ev === "confirmed" ? "STAGED_SECOND_FILLED" : "STAGED_SECOND_FORFEIT",
+          reason: `staged shadow: second half ${ev} @${t.mid}`,
+          detail: { instId: staged.instId, mid: t.mid, secondPx: staged.secondPx },
+        });
+      }
+    } else if (staged && !p) {
+      // Position vanished without a settle hook (e.g. reconcile-adopted flat): drop the shadow, don't invent data.
+      delete this.stagedPlans[id];
+    }
     if (rollDay(bee, now)) {
       this.d.bus.emit("cap", { bee: id, cap: null, detail: "new UTC day: counters and caps reset" }, now);
     }
@@ -1039,6 +1057,17 @@ private filterVenueMenu(menu: Menu, coins: string[]): Menu {
     const ok = await this.order(id, decisionId, instId, side === "long" ? "buy" : "sell", contracts, false, "open");
     const bee = this.bees[id];
     if (!ok || !bee.position) return;
+    // Staged-entry ghost: shadow Grim's one-shot with the staged counterfactual (measurement only).
+    if (this.brain(id).id === "bizzy" && side === "long") {
+      const pos = bee.position;
+      const plan = planStaged(instId, pos.coin, pos.entryPx, pos.contracts, this.now());
+      this.stagedPlans[id] = plan;
+      this.d.db.insertGhostDecision({
+        bee: id, ts: this.now(), choice: "STAGED_PLAN",
+        reason: `staged shadow: half now @${pos.entryPx}, half on +30bp within 60m`,
+        detail: { ...plan },
+      });
+    }
     bee.tradesToday++;
     const ctx = this.ctx(id, this.now());
     const p = bee.position;
@@ -1071,6 +1100,18 @@ private filterVenueMenu(menu: Menu, coins: string[]): Menu {
     const notionalUsd = res.contracts * inst.ctVal * res.avgPx;
     db.insertFill({ orderId, bee: id, ts: res.ts, instId, side, contracts: res.contracts, px: res.avgPx, notionalUsd, feeUsd: res.feeUsd, realisedUsd: realised });
     mark(bee, res.avgPx, inst.ctVal);
+    // Staged-entry ghost: settle the staged shadow at the REAL exit (bizzy only, measurement).
+    // Full closes only: a partial trim leaves the live position (and the shadow) running.
+    const plan = this.stagedPlans[id];
+    if (plan && reduceOnly && !bee.position) {
+      const s = settleStaged(plan, res.avgPx, inst.ctVal);
+      this.d.db.insertGhostDecision({
+        bee: id, ts: res.ts, choice: "STAGED_SETTLE",
+        reason: `staged shadow settled: staged ${s.stagedPnlUsd >= 0 ? "+" : ""}${s.stagedPnlUsd.toFixed(2)} vs one-shot ${s.oneShotPnlUsd >= 0 ? "+" : ""}${s.oneShotPnlUsd.toFixed(2)}`,
+        detail: { ...s, entryPx: plan.entryPx, exitPx: res.avgPx, instId: plan.instId },
+      });
+      delete this.stagedPlans[id];
+    }
     const dir = reduceOnly ? "CLOSE" : side === "buy" ? "LONG" : "SHORT";
     bus.emit("fill", {
       bee: id,
