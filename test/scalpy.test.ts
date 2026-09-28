@@ -61,15 +61,24 @@ describe("scalpy menu (one setup, or nothing)", () => {
     expect(Object.keys(m)).toEqual(["SCALP_BTC"]);
     expect(m.SCALP_BTC!.intent).toMatchObject({ kind: "open", side: "long", setup: "strict" });
   });
-  it("freshest break wins across the whole list; wide spreads never qualify", () => {
+  it("Dash takes the freshest, Zip the second-freshest: split, never mirror", () => {
     const v = view([
       coin("BTC", { micro: { hiN: 99.8, loN: 98, volRatio: 1.5 } }, 100), // +20bp
       coin("ETH", { micro: { hiN: 99.9, loN: 98, volRatio: 1.5 } }, 100), // +10bp → fresher
       coin("HYPE", { micro: { hiN: 99.95, loN: 98, volRatio: 9 } }, 100), // +5bp → freshest, qualifies
       coin("SOL", { micro: { hiN: 99.9, loN: 98, volRatio: 9 } , spreadBp: 50 }, 100),
     ]);
-    expect(Object.keys(scalpy.menu(ctx("scalpy", bee("scalpy"), v)))).toEqual(["SCALP_HYPE"]);
-    expect(pickScalp(ctx("scalpy", bee("scalpy"), v))?.coin).toBe("HYPE");
+    const dash = ctx("scalpy", bee("scalpy"), v);
+    const zip = ctx("scalpy", bee("bee5"), v);
+    expect(Object.keys(scalpy.menu(dash))).toEqual(["SCALP_HYPE"]);
+    expect(Object.keys(scalpy.menu(zip))).toEqual(["SCALP_ETH"]);
+    expect(pickScalp(dash)?.coin).toBe("HYPE");
+  });
+  it("one setup only: Dash takes it, Zip waits", () => {
+    const v = view([coin("BTC", { micro: { hiN: 99.8, loN: 98, volRatio: 1.5 } }, 100)]);
+    expect(Object.keys(scalpy.menu(ctx("scalpy", bee("scalpy"), v)))).toEqual(["SCALP_BTC"]);
+    const zip = ctx("scalpy", bee("bee5"), v);
+    expect(Object.keys(scalpy.menu(zip))).toEqual([]);
   });
   it("flat with no trigger = empty menu (nothing to ask Jev)", () => {
     const m = scalpy.menu(ctx("scalpy", bee("scalpy"), view([coin("BTC", wide, 99)])));

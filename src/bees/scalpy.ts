@@ -52,11 +52,24 @@ export function microSetup(s: CoinStats): MicroSetup | null {
 
 /** Freshest break first (smallest non-negative gap), volume breaks ties. */
 export function pickScalp(ctx: BeeContext): MicroSetup | null {
+  return rankScalps(ctx)[0] ?? null;
+}
+
+/** All qualifying setups, freshest first. */
+export function rankScalps(ctx: BeeContext): MicroSetup[] {
   return scalpStats(ctx)
     .map((s) => microSetup(s))
     .filter((x): x is MicroSetup => !!x)
-    .sort((a, b) => a.gapPct - b.gapPct || b.volRatio - a.volRatio)[0] ?? null;
+    .sort((a, b) => a.gapPct - b.gapPct || b.volRatio - a.volRatio);
 }
+
+/**
+ * bee5 (Zip) takes the SECOND-freshest setup, bee4 (Dash) the freshest — so the
+ * pair split the book instead of mirroring it. One qualifying setup means Dash
+ * takes it and Zip waits (flat is fine). No shared state, no races: the rank is
+ * positional, and both bees compute the same ranking.
+ */
+export const SCALPY_SECOND_SLOT = "bee5";
 
 /** Nearest micro-high by % still to rise (null = no micro data). Whole gated list. */
 function nearestOwn(ctx: BeeContext): { coin: string; pct: number; mid: number } | null {
@@ -113,10 +126,12 @@ export const scalpy: BeeBrain = {
   },
 
   menu(ctx): Menu {
-    // Flat: the one setup, or nothing (no question for Jev either way — ruleDriven).
-    // Positioned: nothing — the stop, the TP ladder and the time stop all fire in code.
+    // Flat: Dash takes the freshest setup, Zip the second-freshest (split, never
+    // mirror) — or nothing. Positioned: nothing — the stop, the TP ladder and
+    // the time stop all fire in code.
     if (ctx.bee.position) return {};
-    const pick = pickScalp(ctx);
+    const ranked = rankScalps(ctx);
+    const pick = ctx.bee.id === SCALPY_SECOND_SLOT ? ranked[1] : ranked[0];
     if (!pick) return {};
     return {
       [`SCALP_${pick.coin}`]: {

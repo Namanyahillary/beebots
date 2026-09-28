@@ -8,12 +8,11 @@ never chase past). Sizing floor bites immediately on small books (~1.5% risk on 
 — flagged for the 30-scalp review.
 Concurrency (owner call 2026-09-28): two slots run the playbook side by side
 (bee4 Dash, bee5 Zip), so two scalps can work concurrently while every bee keeps
-its single position — no multi-position engine surgery. Both brains are identical;
-divergence comes free from different books/timing (one positioned, capped or
-cooling while the other fires). If both take the same setup that is two wolves
-agreeing, not a bug — fills attribute per bee, and the review judges whether
-duplication helps or hurts. True multi-position-per-bee stays refused pending
-evidence. The 30-scalp gate counts combined resolved scalps across both slots.
+its single position — no multi-position engine surgery. Rank-split (trade #1
+mirrored perfectly, so split from 2026-09-28): Dash takes the freshest setup,
+Zip the second-freshest; one setup means Dash takes it and Zip waits. Known cost:
+a lone setup while Dash is busy goes untaken — cheap on quiet markets, measured
+in Zip's idle stats. True multi-position-per-bee stays refused pending evidence. The 30-scalp gate counts combined resolved scalps across both slots.
 
 ## Thesis (one paragraph)
 
