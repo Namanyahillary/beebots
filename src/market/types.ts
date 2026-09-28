@@ -73,8 +73,8 @@ export interface CoinStats {
   trend?: TrendStats;
   /** Larry Williams volatility breakout (bizzy): today's UTC open + k x yesterday's range, from 1h bars. prevHigh (previous UTC day high) supports the Stinger strict setup; absent on old/absent data. */
   breakout?: { dayOpen: number; prevRange: number; trigger: number; prevHigh?: number | null } | null;
-  /** Micro-breakout (scalpy): 15m Donchian channel + 15m volume vs its 24h median, from confirmed 15m bars. */
-  micro?: { hiN: number; loN: number; volRatio: number | null } | null;
+  /** Micro-breakout (scalpy): 15m Donchian channel + 15m volume vs its 24h median, from confirmed 15m bars. formingHigh is the still-forming bar's high (wick-exhaustion tagging; null when every bar is confirmed). */
+  micro?: { hiN: number; loN: number; volRatio: number | null; formingHigh?: number | null } | null;
 }
 
 export interface TrendStats {

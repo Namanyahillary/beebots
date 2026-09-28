@@ -222,7 +222,7 @@ export class MarketFeed {
 export const MICRO_DONCHIAN_N = 20;
 export const MICRO_VOL_MEDIAN_N = 96;
 
-export function microLevels(c15: Candle[]): { hiN: number; loN: number; volRatio: number | null } | null {
+export function microLevels(c15: Candle[]): { hiN: number; loN: number; volRatio: number | null; formingHigh: number | null } | null {
   const done = c15.filter((c) => c.confirmed);
   if (done.length < MICRO_DONCHIAN_N + 1) return null;
   const win = done.slice(-MICRO_DONCHIAN_N - 1, -1);
@@ -230,7 +230,9 @@ export function microLevels(c15: Candle[]): { hiN: number; loN: number; volRatio
   const loN = Math.min(...win.map((c) => c.l));
   const latest = done[done.length - 1]!.volUsd;
   const med = median(done.slice(-MICRO_VOL_MEDIAN_N - 1, -1).map((c) => c.volUsd));
-  return { hiN, loN, volRatio: med ? latest / med : null };
+  // The still-forming bar's high: wick-exhaustion tagging only, never the channel.
+  const forming = [...c15].reverse().find((c) => !c.confirmed)?.h ?? null;
+  return { hiN, loN, volRatio: med ? latest / med : null, formingHigh: forming };
 }
 
 /** Larry Williams k: the trigger is today's open plus k x yesterday's high-low range (k = 0.5 in the source). */

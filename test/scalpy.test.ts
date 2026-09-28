@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { microLevels } from "../src/market/data.js";
 import type { Candle } from "../src/market/types.js";
 import { takeProfitSignal } from "../src/risk.js";
-import { MICRO_MAX_CHASE_BPS, MICRO_MIN_VOL_RATIO, microSetup, pickScalp, scalpy, SCALPY_TIME_STOP_MIN } from "../src/bees/scalpy.js";
+import { MICRO_MAX_CHASE_BPS, MICRO_MIN_VOL_RATIO, microSetup, pickScalp, scalpy, SCALPY_TIME_STOP_MIN, thrustState } from "../src/bees/scalpy.js";
 import { bee, coin, ctx, NOW, position, testConfig, view } from "./fixtures.js";
 
 const candle = (h: number, l: number, vol: number, confirmed = true): Candle => ({ ts: 1, o: l, h, l, c: (h + l) / 2, volUsd: vol, confirmed });
@@ -50,7 +50,40 @@ describe("microSetup (strict micro-long)", () => {
   });
   it("null without micro data", () => {
     expect(microSetup(coin("BTC", {}, 100))).toBeNull();
-    expect(microSetup(coin("BTC", { micro: { hiN: 99, loN: 98, volRatio: null } }, 100))).toBeNull();
+    expect(microSetup(coin("BTC", { micro: { hiN: 99, loN: 98, volRatio: null, formingHigh: null } }, 100))).toBeNull();
+  });
+});
+
+describe("thrustState (wick-exhaustion tag, attribution only)", () => {
+  const base = { hiN: 100, loN: 98, volRatio: 1.5 };
+  it("fresh: no forming spike, or spike held", () => {
+    expect(thrustState(coin("BTC", { micro: { ...base, formingHigh: null } }, 100.1))).toBeNull();
+    expect(thrustState(coin("BTC", {}, 100.1))).toBeNull();
+    // Spiked +10bp, still holding near the high: not exhausted.
+    const held = thrustState(coin("BTC", { micro: { ...base, formingHigh: 100.1 } }, 100.09))!;
+    expect(held.exhausted).toBe(false);
+    expect(held.spikedBp).toBeCloseTo(10, 5);
+  });
+  it("exhausted: spiked ≥30bp and retraced >50% of the thrust", () => {
+    // High printed +50bp over, touch sagged to +15bp: retraced 70%.
+    const t = thrustState(coin("BTC", { micro: { ...base, formingHigh: 100.5 } }, 100.15))!;
+    expect(t.spikedBp).toBeCloseTo(50, 5);
+    expect(t.retracedFrac).toBeCloseTo(0.7, 5);
+    expect(t.exhausted).toBe(true);
+  });
+  it("big spike mostly held is not exhausted", () => {
+    const t = thrustState(coin("BTC", { micro: { ...base, formingHigh: 100.5 } }, 100.4))!;
+    expect(t.retracedFrac).toBeCloseTo(0.2, 5);
+    expect(t.exhausted).toBe(false);
+  });
+  it("menu labels the exhausted entry _XHT and takes it anyway (tag, not veto)", () => {
+    const v = view([coin("BTC", { micro: { ...base, formingHigh: 100.5, volRatio: 1.5 } }, 100.15)]);
+    const m = scalpy.menu(ctx("scalpy", bee("scalpy"), v));
+    expect(Object.keys(m)).toEqual(["SCALP_BTC_XHT"]);
+    expect(m.SCALP_BTC_XHT!.intent).toMatchObject({ kind: "open", side: "long" });
+    expect(m.SCALP_BTC_XHT!.desc).toContain("wick");
+    const fresh = view([coin("ETH", { micro: { ...base, formingHigh: 100.1, volRatio: 1.5 } }, 100.09)]);
+    expect(Object.keys(scalpy.menu(ctx("scalpy", bee("scalpy"), fresh)))).toEqual(["SCALP_ETH"]);
   });
 });
 

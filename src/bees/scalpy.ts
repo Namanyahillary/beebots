@@ -50,6 +50,30 @@ export function microSetup(s: CoinStats): MicroSetup | null {
   return { instId: s.instId, coin: s.coin, gapPct, volRatio: m.volRatio };
 }
 
+/**
+ * Wick-exhaustion tag (attribution only, never a veto): did the forming 15m bar
+ * spike ≥EXHAUST_SPIKE_BPS over the micro-high and retrace >50% of that thrust
+ * before entry? A sagging spike that still passes the chase guard is textbook
+ * bull-trap — the 30-scalp review splits FRESH vs XHT fills with numbers.
+ */
+export const EXHAUST_SPIKE_BPS = 30;
+export const EXHAUST_RETRACE_FRAC = 0.5;
+
+export interface ThrustState {
+  spikedBp: number;
+  retracedFrac: number;
+  exhausted: boolean;
+}
+
+export function thrustState(s: CoinStats): ThrustState | null {
+  const m = s.micro;
+  if (!m || m.formingHigh == null || !(m.formingHigh > m.hiN)) return null;
+  const thrust = m.formingHigh - m.hiN;
+  const spikedBp = (thrust / m.hiN) * 10_000;
+  const retracedFrac = (m.formingHigh - s.mid) / thrust;
+  return { spikedBp, retracedFrac, exhausted: spikedBp >= EXHAUST_SPIKE_BPS && retracedFrac > EXHAUST_RETRACE_FRAC };
+}
+
 /** Freshest break first (smallest non-negative gap), volume breaks ties. */
 export function pickScalp(ctx: BeeContext): MicroSetup | null {
   return rankScalps(ctx)[0] ?? null;
@@ -127,15 +151,21 @@ export const scalpy: BeeBrain = {
 
   menu(ctx): Menu {
     // Flat: Dash takes the freshest setup, Zip the second-freshest (split, never
-    // mirror) — or nothing. Positioned: nothing — the stop, the TP ladder and
-    // the time stop all fire in code.
+    // mirror) — or nothing. The label carries the wick tag (SCALP_<coin> fresh,
+    // SCALP_<coin>_XHT exhausted thrust) so fills attribute clean vs bull-trap
+    // entries; the code takes either one. Positioned: nothing — the stop, the TP
+    // ladder and the time stop all fire in code.
     if (ctx.bee.position) return {};
     const ranked = rankScalps(ctx);
     const pick = ctx.bee.id === SCALPY_SECOND_SLOT ? ranked[1] : ranked[0];
     if (!pick) return {};
+    const s = ctx.view.stats.get(pick.instId);
+    const t = s ? thrustState(s) : null;
+    const label = t?.exhausted ? `SCALP_${pick.coin}_XHT` : `SCALP_${pick.coin}`;
+    const wick = t ? `, wick +${t.spikedBp.toFixed(0)}bp retraced ${(t.retracedFrac * 100).toFixed(0)}%` : "";
     return {
-      [`SCALP_${pick.coin}`]: {
-        desc: `micro-break +${pick.gapPct.toFixed(2)}%, vol ${pick.volRatio.toFixed(1)}x median`,
+      [label]: {
+        desc: `micro-break +${pick.gapPct.toFixed(2)}%, vol ${pick.volRatio.toFixed(1)}x median${wick}`,
         intent: { kind: "open", instId: pick.instId, side: "long", sizeFrac: 1, setup: "strict" },
       },
     };
