@@ -45,6 +45,8 @@ export const BRAND = {
     slot4Glow: "rgba(139, 92, 246, 0.45)",
     slot5: "#22d3ee",
     slot5Glow: "rgba(34, 211, 238, 0.45)",
+    slot6: "#ec4899",
+    slot6Glow: "rgba(236, 72, 153, 0.45)",
   },
 
   /** Fragment for OpenAI image generator to create wolf character portraits in matching style */
@@ -96,6 +98,15 @@ export const BRAND = {
       color: "var(--zippy)",
       glow: "var(--zippy-glow)",
       img: "/bees/scalpy.jpg",
+    },
+    bee6: {
+      name: "Rook",
+      tagline: "the contrarian",
+      styleLabel: "Fade",
+      blurb: "Fades crowded positioning: shorts overcrowded longs, longs washed-out shorts. Rare, wide stops, rule-driven.",
+      color: "var(--fade)",
+      glow: "var(--fade-glow)",
+      img: "/bees/fade.jpg",
     },
   },
 

@@ -66,8 +66,8 @@ interface Props {
   decisions?: DecisionEvent[];
 }
 
-const STYLE_LABEL: Record<string, string> = { bizzy: "Breakout", breezy: "Trend", boozy: "Momentum", scalpy: "Scalp" };
-const DEFAULT_STYLE: Record<BeeName, string> = { bee1: "bizzy", bee2: "breezy", bee3: "boozy", bee4: "scalpy", bee5: "scalpy" };
+const STYLE_LABEL: Record<string, string> = { bizzy: "Breakout", breezy: "Trend", boozy: "Momentum", scalpy: "Scalp", fade: "Fade" };
+const DEFAULT_STYLE: Record<BeeName, string> = { bee1: "bizzy", bee2: "breezy", bee3: "boozy", bee4: "scalpy", bee5: "scalpy", bee6: "fade" };
 
 /** A trigger chip that explains itself: tap for the full rule, status, and where to watch it. */
 function TriggerBadge({ label }: { label: string }) {
@@ -160,6 +160,23 @@ function EngineHelp({ styleId }: { styleId: string }) {  if (styleId === "breezy
           <dd>Trim half at +0.4R, close the rest at +0.8R (a full run banks 0.6R — $3 on $5 risk), breakeven at +0.3R, and a 45-minute time stop shoots overstayers.</dd>
           <dt>Gate</dt>
           <dd>At 30 resolved scalps the book judges it: expectancy above zero net of fees keeps it, otherwise it is killed. No extensions.</dd>
+        </dl>
+        <p>Watch this when you compare what each slot is built to do.</p>
+      </Help>
+    );
+  if (styleId === "fade")
+    return (
+      <Help title="Engine: Fade">
+        <p>This badge names the strategy this slot runs.</p>
+        <dl>
+          <dt>Universe</dt>
+          <dd>It fades crowded positioning on every liquid coin: funding z-score at ±2 with a ±8% 24-hour move behind it.</dd>
+          <dt>Two-sided</dt>
+          <dd>Shorts crowded longs into extended rallies, longs washed-out shorts. The only contrarian in the pack.</dd>
+          <dt>Exits</dt>
+          <dd>Wide 2x ATR stops because crowds overshoot, trim half at +1R, close the rest at +2R, breakeven at +0.75R, dead at 6 hours.</dd>
+          <dt>Gate</dt>
+          <dd>At 20 resolved fades the book judges it: expectancy above zero net of fees keeps it, otherwise it is killed. No extensions.</dd>
         </dl>
         <p>Watch this when you compare what each slot is built to do.</p>
       </Help>

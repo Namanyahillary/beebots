@@ -5,8 +5,8 @@ import { chmodSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSy
 import { dirname } from "node:path";
 import { z } from "zod";
 
-export const STYLES = ["bizzy", "breezy", "boozy", "scalpy"] as const;
-/** A trading style is one of the four built-in strategies, named after the bee that first traded it. */
+export const STYLES = ["bizzy", "breezy", "boozy", "scalpy", "fade"] as const;
+/** A trading style is one of the five built-in strategies, named after the bee that first traded it. */
 export type StyleId = (typeof STYLES)[number];
 
 export const STYLE_INFO: Record<StyleId, { label: string; blurb: string; name: string; tagline: string }> = {
@@ -34,6 +34,12 @@ export const STYLE_INFO: Record<StyleId, { label: string; blurb: string; name: s
     name: "Dash",
     tagline: "the quick one",
   },
+  fade: {
+    label: "Fade",
+    blurb: "Contrarian: shorts crowded longs paying extreme funding into extended rallies, longs washed-out shorts. Rare, wide stops, rule-driven.",
+    name: "Rook",
+    tagline: "the contrarian",
+  },
 };
 
 /**
@@ -41,8 +47,9 @@ export const STYLE_INFO: Record<StyleId, { label: string; blurb: string; name: s
  * name (two wolves, one playbook). bee5 runs scalpy beside bee4, so two
  * scalps can work concurrently while every bee keeps its single position.
  */
-export const SLOT_IDENTITY: Partial<Record<"bee1" | "bee2" | "bee3" | "bee4" | "bee5", { name: string; tagline: string }>> = {
+export const SLOT_IDENTITY: Partial<Record<"bee1" | "bee2" | "bee3" | "bee4" | "bee5" | "bee6", { name: string; tagline: string }>> = {
   bee5: { name: "Zip", tagline: "the restless one" },
+  bee6: { name: "Rook", tagline: "the contrarian" },
 };
 
 /** The original wolves are the official ones: owners' wolves may not use their names ("Blaze", "blaze-wolf", "Blaze Wolf"). */

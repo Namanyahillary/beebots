@@ -196,3 +196,16 @@ two scalps can work concurrently while every bee keeps its single position — n
 multi-position engine surgery (still refused pending evidence). Gate counts
 combined resolved scalps across both slots. Decision gate at 30
 resolved scalps: expectancy > 0 net of fees keeps them, else kill with postmortem.
+
+## Rook, 6th bee (shipped 2026-09-28 — gate open, judgement at 20 fades)
+
+bee6 "Rook" runs `fade`, the contrarian from `strategies/FADE.md` (now LIVE) —
+my pick for the slot you offered: everything else is momentum/long, so the only
+untested axis left is fading crowded positioning. Shorts fundingZ ≥ +2 into +8%
+days, longs fundingZ ≤ -2 into -8% washouts, whole gated list, 1% risk on wide
+2× ATR stops, trim half +1R / out +2R, BE +0.75R, 6h time stop, 3/day $3 budget,
+rule-driven like scalpy. Deliberately OI-free (`oi1h_pct` verified null on every
+coin — nothing here may depend on it). Paper gets the long leg only (venue_short
+handles the rest). Decision gate at 20 resolved fades (rare by construction —
+this one takes weeks): expectancy > 0 net of fees keeps it, else kill with
+postmortem.
