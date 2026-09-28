@@ -21,9 +21,20 @@ function readSoundPref(): boolean {
   }
 }
 
+type PosFilter = "all" | "flat" | "open";
+
+function readPosFilter(): PosFilter {
+  try {
+    const v = localStorage.getItem("bees.posFilter");
+    return v === "flat" || v === "open" ? v : "all";
+  } catch {
+    return "all";
+  }
+}
+
 export function App() {
   const [soundOn, setSoundOn] = useState(false);
-  const [posFilter, setPosFilter] = useState<"all" | "flat" | "open">("all");
+  const [posFilter, setPosFilter] = useState<PosFilter>(readPosFilter);
   const feed = useFeed(soundOn);
   const [, force] = useState(0);
   const [boardCollapsed, boardCollapseBtn] = useCollapsed("board");
@@ -53,6 +64,15 @@ export function App() {
     }
   };
 
+  const pickPosFilter = (f: PosFilter) => {
+    setPosFilter(f);
+    try {
+      localStorage.setItem("bees.posFilter", f);
+    } catch {
+      /* private mode: fine */
+    }
+  };
+
   const board = [...BEE_NAMES].sort((a, b) => (feed.bees[b]?.equityUsd ?? 0) - (feed.bees[a]?.equityUsd ?? 0));
   // Position filter (All / Flat / Open): display only. Ranks and gaps still
   // measure against the full pack, so filtering never flatters anyone. Fewer
@@ -69,7 +89,7 @@ export function App() {
       <div className="toolbar" role="group" aria-label="Filter wolves by position">
         <span className="dim">showing</span>
         {(["all", "flat", "open"] as const).map((f) => (
-          <button key={f} type="button" className="seg" aria-pressed={posFilter === f} onClick={() => setPosFilter(f)}>
+          <button key={f} type="button" className="seg" aria-pressed={posFilter === f} onClick={() => pickPosFilter(f)}>
             {f === "all" ? "All" : f === "flat" ? "Flat" : "Open"}
           </button>
         ))}
