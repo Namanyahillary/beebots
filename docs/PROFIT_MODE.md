@@ -186,7 +186,7 @@ coins empirically. 1.2x median-volume confirm, 30bp chase guard, 0.75x ATR(15m) 
 +0.4R / close the rest at +0.8R (full run banks 0.6R = $3 on $5 risk — owner call
 2026-09-28, bank the certain $3 over watching +$2 retrace to scratch), BE at +0.3R, 45m time stop,
 80 trades/day, $20 fee budget (10x'd for data-gathering — the gate is % lost:
-8% daily-loss stop + 40% retire line), 15m cooldown. Entries are RULE-DRIVEN — Jev is never
+8% daily-loss stop + 40% retire line), 5m cooldown. Entries are RULE-DRIVEN — Jev is never
 asked (new `ruleDriven` brain flag: engine takes the single setup as-is, all code
 gates still fire). Sizing is risk-normalized at 0.5% of equity with a $5 floor so
 the +1R target clears the fee wall (on a $333 book that means ~1.5% risk — the

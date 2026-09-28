@@ -49,7 +49,7 @@ spec refuses to pretend otherwise.
   BE-move at +0.3R with fee buffer.
 - **Time stop:** 45 minutes. A scalp still open at 45 minutes is a failed scalp: market-close it,
   log `time_stop`, no exceptions. (Grim rides to midnight; Scalpy gets an hour.)
-- **Cadence guards:** 80 trades/day, $20/day fee budget (owner call 2026-09-28: 10x'd for data-gathering — count/budget caps censor the sample, so the gate is the 8% daily-loss stop + 40% retire line, i.e. percentage lost, not trades taken). 15-minute cooldown between fills stays as the anti-churn brake. Flat is fine. Churn is the enemy, not idleness.
+- **Cadence guards:** 80 trades/day, $20/day fee budget (owner call 2026-09-28: 10x'd for data-gathering — count/budget caps censor the sample, so the gate is the 8% daily-loss stop + 40% retire line, i.e. percentage lost, not trades taken). 15-minute cooldown between fills stays as the anti-churn brake. Flat is fine. Churn is the enemy, not idleness. (Cooldown 15 → 5, owner call 2026-09-28: with loss-based gates guarding the book, 15 was decoration; 5 keeps spacing against whipsaw chains.)
 - **JEV:** never asked (see pre-review #4). Menus stay empty; status lines cite the rule.
   Revisit only if rule-driven expectancy is positive AND JEV-gated entries beat it in ghost.
 
@@ -65,7 +65,7 @@ spec refuses to pretend otherwise.
 1. `src/settings.ts`: STYLES += "scalpy", STYLE_INFO entry (name crawling: needs a wolf name +
    portrait; until painted, placeholder mark via BEE_MARK_URL).
 2. `src/config.ts`: BEES += "bee4", DEFAULT_SLOTS, perSlot("BEE4") (OKX + Alpaca keys),
-   perStyle("SCALPY", { trades: 8, fee: 2.0, spread: 5, cooldown: 15, stopAtr: 0.75, maxFlat: 0 }).
+   perStyle("SCALPY", { trades: 80, fee: 20.0, spread: 5, cooldown: 5, stopAtr: 0.75, maxFlat: 0 }).
 3. `src/bees/scalpy.ts`: brain (micro-breakout universe/menu, sizing, stops, takeProfit ladder,
    45m time stop, neverForce, no JEV menu — empty menu + idleStatus/idleDetail with watched price).
 4. `src/bees/index.ts`: BRAINS += scalpy. Engine is BEES-generic (decide/risk/reconcile/ledger

@@ -120,7 +120,7 @@ const EnvSchema = z.object({
   ...perStyle("BREEZY", { trades: 3, fee: 1.0, spread: 5, cooldown: 240, stopAtr: 2, maxFlat: 0 }),
   ...perStyle("BIZZY", { trades: 1, fee: 1.0, spread: 5, cooldown: 5, stopAtr: 1.5, maxFlat: 20 }),
   ...perStyle("BOOZY", { trades: 3, fee: 3.0, spread: 15, cooldown: 2, stopAtr: 2, maxFlat: 0 }),
-  ...perStyle("SCALPY", { trades: 80, fee: 20.0, spread: 5, cooldown: 15, stopAtr: 0.75, maxFlat: 0 }),
+  ...perStyle("SCALPY", { trades: 80, fee: 20.0, spread: 5, cooldown: 5, stopAtr: 0.75, maxFlat: 0 }),
   ...perSlot("BEE1"),
   ...perSlot("BEE2"),
   ...perSlot("BEE3"),
