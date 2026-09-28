@@ -1,15 +1,21 @@
-// scalpy-bee (bee4, "Dash"): fast day-trader. See strategies/SCALPER.md.
-// One setup only — 15m Donchian micro-breakout, longs only, on BTC/ETH/SOL —
-// with rule-driven entries: Jev is never asked (1-3s of reasoning latency is a
-// lifetime at this timescale), the code takes the setup when it triggers and
-// the stop / TP ladder / time stop do the rest. Every number is guilty until
-// the 30-scalp gate judges it.
+// scalpy-bee (bee4 "Dash", bee5 "Zip"): fast day-trader. See strategies/SCALPER.md.
+// One setup only — 15m Donchian micro-breakout, longs only, on the whole gated
+// list — with rule-driven entries: Jev is never asked (1-3s of reasoning latency
+// is a lifetime at this timescale), the code takes the setup when it triggers
+// and the stop / TP ladder / time stop do the rest. Every number is guilty
+// until the 30-scalp gate judges it.
 import type { CoinStats } from "../market/types.js";
 import { atrStop, maxNotionalUsd, r2 } from "./common.js";
 import type { BeeBrain, BeeContext, IdleDetail, Menu } from "./types.js";
 
-/** Tightest spreads, deepest books. HYPE excluded until spreads prove out. */
-export const SCALPY_COINS = ["BTC", "ETH", "SOL"] as const;
+/** The whole gated list (volume + spread screened), not a hardcoded trio: the 5bp
+ *  spread gate and the volume confirm do the excluding empirically. Thin coins
+ *  fail the gates on their own; no allowlist to maintain. */
+function scalpStats(ctx: BeeContext): CoinStats[] {
+  return ctx.view.gated
+    .map((id) => ctx.view.stats.get(id))
+    .filter((s): s is CoinStats => !!s && !!s.micro && s.spreadBp <= ctx.knobs.spreadGateBps);
+}
 /** The 15m bar must be at least this many x its 24h median volume. */
 export const MICRO_MIN_VOL_RATIO = 1.2;
 /** Chase guard (post-SOL-consensus): a micro-high more than this far below the
@@ -44,11 +50,6 @@ export function microSetup(s: CoinStats): MicroSetup | null {
   return { instId: s.instId, coin: s.coin, gapPct, volRatio: m.volRatio };
 }
 
-function scalpStats(ctx: BeeContext): CoinStats[] {
-  const byCoin = new Map([...ctx.view.stats.values()].map((s) => [s.coin, s]));
-  return SCALPY_COINS.map((c) => byCoin.get(c)).filter((s): s is CoinStats => !!s && !!s.micro && s.spreadBp <= ctx.knobs.spreadGateBps);
-}
-
 /** Freshest break first (smallest non-negative gap), volume breaks ties. */
 export function pickScalp(ctx: BeeContext): MicroSetup | null {
   return scalpStats(ctx)
@@ -57,7 +58,7 @@ export function pickScalp(ctx: BeeContext): MicroSetup | null {
     .sort((a, b) => a.gapPct - b.gapPct || b.volRatio - a.volRatio)[0] ?? null;
 }
 
-/** Nearest micro-high by % still to rise (null = no micro data). Own 3-coin list only. */
+/** Nearest micro-high by % still to rise (null = no micro data). Whole gated list. */
 function nearestOwn(ctx: BeeContext): { coin: string; pct: number; mid: number } | null {
   const rows = scalpStats(ctx)
     .map((s) => ({ coin: s.coin, pct: s.micro ? ((s.micro.hiN - s.mid) / s.mid) * 100 : null, mid: s.mid }))
@@ -70,7 +71,7 @@ export const scalpy: BeeBrain = {
   id: "scalpy",
   triggers: ["micro-breakout"],
   strategy:
-    "You are scalpy-bee, the fast day-trader. You fish the 15-60 minute wiggle on BTC, ETH and SOL: when the price breaks above its 20-bar 15-minute high on 1.2x median volume, inside a 30bp chase guard, you take it long at risk-normalized size with a 0.75x ATR stop, trim half at +0.5R, close the rest at +1R, and time-stop anything alive at 45 minutes. Small, frequent, out fast. (Rule-driven: the code executes this, Jev is never asked.)",
+    "You are scalpy-bee, the fast day-trader. You fish the 15-60 minute wiggle on every liquid coin: when the price breaks above its 20-bar 15-minute high on 1.2x median volume, inside a 30bp chase guard, you take it long at risk-normalized size with a 0.75x ATR stop, trim half at +0.5R, close the rest at +1R, and time-stop anything alive at 45 minutes. Small, frequent, out fast. (Rule-driven: the code executes this, Jev is never asked.)",
   convictionLabels: ["cold", "warm", "hot", "gone"],
   neverForce: true,
   requiresStrictSetup: true,

@@ -1,15 +1,15 @@
 import { z } from "zod";
-import { STYLE_INFO, STYLES, type Settings, type StyleId } from "./settings.js";
+import { SLOT_IDENTITY, STYLE_INFO, STYLES, type Settings, type StyleId } from "./settings.js";
 
-/** Four bee slots. bee1-3 trade the Setup wolves' styles (or the original three); bee4 always runs scalpy, the built-in fast day-trader. */
-export const BEES = ["bee1", "bee2", "bee3", "bee4"] as const;
+/** Five bee slots. bee1-3 trade the Setup wolves' styles (or the original three); bee4 and bee5 run scalpy side by side, so two scalps can work concurrently. */
+export const BEES = ["bee1", "bee2", "bee3", "bee4", "bee5"] as const;
 export type BeeId = (typeof BEES)[number];
 export { STYLES, type StyleId };
-/** Slots the Setup page raises and paints (bee4 is built-in and needs no portrait). */
+/** Slots the Setup page raises and paints (bee4/bee5 are built-in and need no portraits). */
 export const SETUP_BEES: ReadonlyArray<BeeId> = ["bee1", "bee2", "bee3"];
 
-/** With no Setup file (settings only from .env), the bees are the original four. */
-const DEFAULT_SLOTS: Record<BeeId, StyleId> = { bee1: "bizzy", bee2: "breezy", bee3: "boozy", bee4: "scalpy" };
+/** With no Setup file (settings only from .env), the bees are the original five. */
+const DEFAULT_SLOTS: Record<BeeId, StyleId> = { bee1: "bizzy", bee2: "breezy", bee3: "boozy", bee4: "scalpy", bee5: "scalpy" };
 /** Typed as the only acknowledgement that unlocks MODE=live. */
 export const LIVE_ACK_PHRASE = "I-ACCEPT-REAL-MONEY-RISK";
 
@@ -125,6 +125,7 @@ const EnvSchema = z.object({
   ...perSlot("BEE2"),
   ...perSlot("BEE3"),
   ...perSlot("BEE4"),
+  ...perSlot("BEE5"),
   // Real money needs DRY_RUN=false, MODE=live AND this set to LIVE_ACK_PHRASE. Paper trading needs none of it.
   LIVE_ACK: opt,
 
@@ -267,9 +268,11 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, settings: Setti
   BEES.forEach((id, i) => {
     const b = settings?.bees[i];
     const style = b?.style ?? DEFAULT_SLOTS[id];
+    // Extra built-in slots (bee5) hunt under their own name, not their style's.
+    const ident = SLOT_IDENTITY[id];
     slots[id] = b
       ? { style, name: b.name, tagline: b.tagline, customImage: b.image, rules: b.rules, coins: b.coins, fromSetup: true }
-      : { style, name: STYLE_INFO[style].name, tagline: STYLE_INFO[style].tagline, customImage: false, rules: "", coins: [], fromSetup: false };
+      : { style, name: ident?.name ?? STYLE_INFO[style].name, tagline: ident?.tagline ?? STYLE_INFO[style].tagline, customImage: false, rules: "", coins: [], fromSetup: false };
   });
 
   const creds: Partial<Record<BeeId, OkxCreds>> = {};

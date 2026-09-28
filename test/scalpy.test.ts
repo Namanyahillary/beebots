@@ -61,15 +61,15 @@ describe("scalpy menu (one setup, or nothing)", () => {
     expect(Object.keys(m)).toEqual(["SCALP_BTC"]);
     expect(m.SCALP_BTC!.intent).toMatchObject({ kind: "open", side: "long", setup: "strict" });
   });
-  it("freshest break wins; HYPE and wide spreads never qualify", () => {
+  it("freshest break wins across the whole list; wide spreads never qualify", () => {
     const v = view([
       coin("BTC", { micro: { hiN: 99.8, loN: 98, volRatio: 1.5 } }, 100), // +20bp
       coin("ETH", { micro: { hiN: 99.9, loN: 98, volRatio: 1.5 } }, 100), // +10bp → fresher
-      coin("HYPE", { micro: { hiN: 99.9, loN: 98, volRatio: 9 } }, 100),
+      coin("HYPE", { micro: { hiN: 99.95, loN: 98, volRatio: 9 } }, 100), // +5bp → freshest, qualifies
       coin("SOL", { micro: { hiN: 99.9, loN: 98, volRatio: 9 } , spreadBp: 50 }, 100),
     ]);
-    expect(Object.keys(scalpy.menu(ctx("scalpy", bee("scalpy"), v)))).toEqual(["SCALP_ETH"]);
-    expect(pickScalp(ctx("scalpy", bee("scalpy"), v))?.coin).toBe("ETH");
+    expect(Object.keys(scalpy.menu(ctx("scalpy", bee("scalpy"), v)))).toEqual(["SCALP_HYPE"]);
+    expect(pickScalp(ctx("scalpy", bee("scalpy"), v))?.coin).toBe("HYPE");
   });
   it("flat with no trigger = empty menu (nothing to ask Jev)", () => {
     const m = scalpy.menu(ctx("scalpy", bee("scalpy"), view([coin("BTC", wide, 99)])));
@@ -86,9 +86,14 @@ describe("scalpy menu (one setup, or nothing)", () => {
     expect(scalpy.ruleDriven).toBe(true);
     expect(scalpy.forcedEntry(ctx("scalpy", bee("scalpy"), view([coin("BTC", wide, 100)])))).toBeNull();
   });
-  it("universe is BTC/ETH/SOL inside the spread gate", () => {
-    const v = view([coin("BTC", wide, 100), coin("HYPE", wide, 100)]);
-    expect(scalpy.universe(ctx("scalpy", bee("scalpy"), v))).toEqual(["BTC-USD_UM_XPERP-310404"]);
+  it("universe is the whole gated list with micro data inside the spread gate", () => {
+    const v = view([
+      coin("BTC", wide, 100),
+      coin("HYPE", wide, 100),
+      coin("SOL", { ...wide, spreadBp: 50 }, 100),
+      coin("DOGE", {}, 1),
+    ]);
+    expect(scalpy.universe(ctx("scalpy", bee("scalpy"), v))).toEqual(["BTC-USD_UM_XPERP-310404", "HYPE-USD_UM_XPERP-310404"]);
   });
 });
 
@@ -149,7 +154,7 @@ describe("scalpy status (idle lines, no Jev spend)", () => {
 });
 
 describe("ruleDriven decide: the code takes the setup, Jev is never called", () => {
-  async function scalpyHarness(px: number) {
+  async function scalpyHarness(px: number, slot: "bee4" | "bee5" = "bee4") {
     const { Db } = await import("../src/db.js");
     const { EventBus } = await import("../src/events.js");
     const { SimExecutor } = await import("../src/exec/executor.js");
@@ -169,10 +174,10 @@ describe("ruleDriven decide: the code takes the setup, Jev is never called", () 
     });
     const exec = new SimExecutor(() => ({ tickers: V.tickers, instruments: V.instruments }), 0.0005, () => NOW);
     const engine = new Engine({ cfg, db, feed, jev, exec, bus, alerts: new Alerts(undefined), now: () => NOW });
-    engine.bees["bee4"] = bee("scalpy");
+    engine.bees[slot] = bee("scalpy");
     type E = { decide(id: string, now: number): Promise<void>; jevMade: Record<string, number>; last: Record<string, { status: string }> };
     const e = engine as unknown as E;
-    return { decide: (t: number) => e.decide("bee4", t), made: () => e.jevMade["bee4"] ?? 0, status: () => e.last["bee4"]?.status ?? "", engine };
+    return { decide: (t: number) => e.decide(slot, t), made: () => e.jevMade[slot] ?? 0, status: () => e.last[slot]?.status ?? "", engine };
   }
   it("opens SCALP_BTC with zero Jev calls", async () => {
     const { decide, made, status, engine } = await scalpyHarness(100);
@@ -187,5 +192,12 @@ describe("ruleDriven decide: the code takes the setup, Jev is never called", () 
     expect(made()).toBe(0);
     expect(engine.bees["bee4"]!.position).toBeNull();
     expect(status()).toContain("micro-high");
+  });
+  it("bee5 (Zip) trades the same playbook on its own book", async () => {
+    const { decide, made, status, engine } = await scalpyHarness(100, "bee5");
+    await decide(NOW);
+    expect(made()).toBe(0);
+    expect(engine.bees["bee5"]!.position?.coin).toBe("BTC");
+    expect(status()).toContain("SCALP_BTC");
   });
 });

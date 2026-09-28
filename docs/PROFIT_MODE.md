@@ -177,16 +177,20 @@ state, Setup styleNote. Left out deliberately: upstream profit-lock rungs (rival
 skip accounting stays until a manual port preserves the metrics), "X Bee" titles
  (declined by owner 2026-09-27 — Grim/Silver/Blaze stay as they are).
 
-## Scalpy, 4th bee (shipped 2026-09-28 — gate open, judgement at 30 scalps)
+## Scalpy, 4th and 5th bees (shipped 2026-09-28 — gate open, judgement at 30 scalps)
 
-bee4 "Dash" runs `scalpy`, the fast day-trader from `strategies/SCALPER.md` (now
-LIVE): 15m Donchian micro-breakout (20-bar high, longs only, BTC/ETH/SOL), 1.2x
-median-volume confirm, 30bp chase guard, 0.75x ATR(15m) hard stop, trim half at
+bee4 "Dash" + bee5 "Zip" run `scalpy`, the fast day-trader from `strategies/SCALPER.md` (now
+LIVE): 15m Donchian micro-breakout (20-bar high, longs only) on the whole gated
+list — owner call 2026-09-28, was BTC/ETH/SOL; the 5bp spread gate excludes thin
+coins empirically. 1.2x median-volume confirm, 30bp chase guard, 0.75x ATR(15m) hard stop, trim half at
 +0.5R / close the rest at +1R (ladder rung frac 1.0), BE at +0.3R, 45m time stop,
 8 trades/day, $2 fee budget, 15m cooldown. Entries are RULE-DRIVEN — Jev is never
 asked (new `ruleDriven` brain flag: engine takes the single setup as-is, all code
 gates still fire). Sizing is risk-normalized at 0.5% of equity with a $5 floor so
 the +1R target clears the fee wall (on a $333 book that means ~1.5% risk — the
-30-scalp review re-judges it). Setup still raises 3 wolves; bee4 is always built-in
-(portrait placeholder until Dash is painted; "Dash" reserved). Decision gate at 30
-resolved scalps: expectancy > 0 net of fees keeps it, else kill with postmortem.
+30-scalp review re-judges it). Setup still raises 3 wolves; bee4/bee5 are always built-in (portrait placeholders
+until Dash and Zip are painted; both names reserved). Two slots, one playbook:
+two scalps can work concurrently while every bee keeps its single position — no
+multi-position engine surgery (still refused pending evidence). Gate counts
+combined resolved scalps across both slots. Decision gate at 30
+resolved scalps: expectancy > 0 net of fees keeps them, else kill with postmortem.

@@ -43,6 +43,8 @@ export const BRAND = {
     slot3Glow: "rgba(220, 38, 38, 0.45)",
     slot4: "#8b5cf6",
     slot4Glow: "rgba(139, 92, 246, 0.45)",
+    slot5: "#22d3ee",
+    slot5Glow: "rgba(34, 211, 238, 0.45)",
   },
 
   /** Fragment for OpenAI image generator to create wolf character portraits in matching style */
@@ -81,9 +83,18 @@ export const BRAND = {
       name: "Dash",
       tagline: "the quick one",
       styleLabel: "Scalp",
-      blurb: "Fast day-trader: fishes the 15-60 minute micro-breakout on BTC, ETH and SOL. Small, frequent, out fast.",
+      blurb: "Fast day-trader: fishes the 15-60 minute micro-breakout on every liquid coin. Small, frequent, out fast.",
       color: "var(--scalpy)",
       glow: "var(--scalpy-glow)",
+      img: "/bees/scalpy.jpg",
+    },
+    bee5: {
+      name: "Zip",
+      tagline: "the restless one",
+      styleLabel: "Scalp",
+      blurb: "Dash's packmate: runs the same micro-breakout playbook from the slot beside him, so two scalps can work at once.",
+      color: "var(--zippy)",
+      glow: "var(--zippy-glow)",
       img: "/bees/scalpy.jpg",
     },
   },

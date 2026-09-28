@@ -1,11 +1,19 @@
 # SCALPY — fast day-trader (4th style, proposed)
 
-Status: LIVE since 2026-09-28 (bee4 "Dash"). Decision gate at 30 resolved scalps — see docs/PROFIT_MODE.md.
+Status: LIVE since 2026-09-28 (bee4 "Dash" + bee5 "Zip"). Decision gate at 30 resolved scalps — see docs/PROFIT_MODE.md.
 Built as specced with two deltas: (1) entries run through a new generic `ruleDriven`
 engine path (single setup taken as-is, zero Jev calls, all code gates still fire);
 (2) a 30bp chase guard on the micro-high (post-SOL consensus: market-take within,
 never chase past). Sizing floor bites immediately on small books (~1.5% risk on $333)
 — flagged for the 30-scalp review.
+Concurrency (owner call 2026-09-28): two slots run the playbook side by side
+(bee4 Dash, bee5 Zip), so two scalps can work concurrently while every bee keeps
+its single position — no multi-position engine surgery. Both brains are identical;
+divergence comes free from different books/timing (one positioned, capped or
+cooling while the other fires). If both take the same setup that is two wolves
+agreeing, not a bug — fills attribute per bee, and the review judges whether
+duplication helps or hurts. True multi-position-per-bee stays refused pending
+evidence. The 30-scalp gate counts combined resolved scalps across both slots.
 
 ## Thesis (one paragraph)
 
@@ -31,7 +39,7 @@ spec refuses to pretend otherwise.
 
 ## Rules (starting guesses — every number below is guilty until measured)
 
-- **Universe:** BTC, ETH, SOL. Tightest spreads, deepest books. HYPE excluded until spreads prove out.
+- **Universe:** the whole gated list (owner call 2026-09-28 — was BTC/ETH/SOL). The 5bp spread gate plus the volume confirm exclude thin coins empirically; no allowlist to maintain.
 - **Entry (micro-breakout):** 15-minute Donchian break (highest high / lowest low, longs only —
   venue reality + shorting microstructure unproven) with spread gate ≤ 5bp and 15m volume ≥
   1.2× its 24h median. One setup, no discretion, no forcing (`neverForce: true`).

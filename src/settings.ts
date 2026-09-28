@@ -30,13 +30,22 @@ export const STYLE_INFO: Record<StyleId, { label: string; blurb: string; name: s
   },
   scalpy: {
     label: "Scalp",
-    blurb: "Fast day-trader: fishes the 15-60 minute micro-breakout on BTC, ETH and SOL. Small, frequent, out fast — rule-driven, Jev never asked.",
+    blurb: "Fast day-trader: fishes the 15-60 minute micro-breakout on every liquid coin. Small, frequent, out fast — rule-driven, Jev never asked.",
     name: "Dash",
     tagline: "the quick one",
   },
 };
 
-/** The original four are the official wolves: owners' wolves may not use their names ("Blaze", "blaze-wolf", "Blaze Wolf"). */
+/**
+ * Extra built-in slots that share a style's brain but hunt under their own
+ * name (two wolves, one playbook). bee5 runs scalpy beside bee4, so two
+ * scalps can work concurrently while every bee keeps its single position.
+ */
+export const SLOT_IDENTITY: Partial<Record<"bee1" | "bee2" | "bee3" | "bee4" | "bee5", { name: string; tagline: string }>> = {
+  bee5: { name: "Zip", tagline: "the restless one" },
+};
+
+/** The original wolves are the official ones: owners' wolves may not use their names ("Blaze", "blaze-wolf", "Blaze Wolf"). */
 const squash = (s: string) =>
   s
     .toLowerCase()
@@ -44,7 +53,7 @@ const squash = (s: string) =>
     .replace(/bee$/, "")
     .replace(/(.)\1+/g, "$1")
     .replace(/(ie|ey|i)$/, "y");
-const RESERVED = new Set(STYLES.map((s) => squash(STYLE_INFO[s].name)));
+const RESERVED = new Set([...STYLES.map((s) => squash(STYLE_INFO[s].name)), ...Object.values(SLOT_IDENTITY).map((w) => squash(w.name))]);
 
 export function isReservedName(name: string): boolean {
   return RESERVED.has(squash(name));

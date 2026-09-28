@@ -1,9 +1,9 @@
 // Mirrors the engine's read-only /snapshot and SSE payloads. No account data exists in these shapes.
 import { BEE_MARK_URL } from "./BeeMark";
 
-/** The four bee slots. Names, taglines and portraits come from the engine's /profile (bee1-3 set on the Setup page; bee4 is the built-in Scalpy). */
-export type BeeName = "bee1" | "bee2" | "bee3" | "bee4";
-export const BEE_NAMES: BeeName[] = ["bee1", "bee2", "bee3", "bee4"];
+/** The five bee slots. Names, taglines and portraits come from the engine's /profile (bee1-3 set on the Setup page; bee4/bee5 are the built-in scalp pair). */
+export type BeeName = "bee1" | "bee2" | "bee3" | "bee4" | "bee5";
+export const BEE_NAMES: BeeName[] = ["bee1", "bee2", "bee3", "bee4", "bee5"];
 
 export type Cap = "trade_cap" | "fee_budget" | "loss_stop" | "retired" | null;
 
@@ -188,6 +188,8 @@ export const BEE_META: Record<BeeName, BeeMeta> = {
   bee3: { short: "Blaze", tagline: "the degen", styleLabel: "Momentum", rules: "", coins: [], img: "/bees/blaze.jpg", color: "var(--boozy)", glow: "var(--boozy-glow)" },
   /** Until Dash's portrait is painted, the placeholder mark (spec: BEE_MARK_URL until painted). */
   bee4: { short: "Dash", tagline: "the quick one", styleLabel: "Scalp", rules: "", coins: [], img: BEE_MARK_URL, color: "var(--scalpy)", glow: "var(--scalpy-glow)" },
+  /** Zip shares Dash's playbook from the slot beside him — same placeholder deal. */
+  bee5: { short: "Zip", tagline: "the restless one", styleLabel: "Scalp", rules: "", coins: [], img: BEE_MARK_URL, color: "var(--zippy)", glow: "var(--zippy-glow)" },
 };
 
 export interface Profile {

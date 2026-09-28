@@ -57,12 +57,12 @@ const squash = (s: string) =>
     .replace(/bee$/, "")
     .replace(/(.)\1+/g, "$1")
     .replace(/(ie|ey|i)$/, "y");
-const RESERVED = new Set(["bizzy", "breezy", "boozy", "scalpy", "dash"].map(squash));
+const RESERVED = new Set(["bizzy", "breezy", "boozy", "scalpy", "dash", "zip"].map(squash));
 const nameProblem = (name: string): string | null =>
   !/^[\p{L}\p{N} .'_-]{1,24}$/u.test(name.trim())
     ? "Names are 1-24 letters, numbers, spaces and . ' _ -"
     : RESERVED.has(squash(name))
-      ? "Blaze, Silver, Grim and Dash are the official wolves. Pick another name."
+      ? "Blaze, Silver, Grim, Dash and Zip are the official wolves. Pick another name."
       : null;
 
 const STEPS = ["The rules", "Password", "Jev", "OpenAI", "Your wolves", "The Hive", "Start"] as const;

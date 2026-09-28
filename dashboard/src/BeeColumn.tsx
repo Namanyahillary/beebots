@@ -67,7 +67,7 @@ interface Props {
 }
 
 const STYLE_LABEL: Record<string, string> = { bizzy: "Breakout", breezy: "Trend", boozy: "Momentum", scalpy: "Scalp" };
-const DEFAULT_STYLE: Record<BeeName, string> = { bee1: "bizzy", bee2: "breezy", bee3: "boozy", bee4: "scalpy" };
+const DEFAULT_STYLE: Record<BeeName, string> = { bee1: "bizzy", bee2: "breezy", bee3: "boozy", bee4: "scalpy", bee5: "scalpy" };
 
 /** A trigger chip that explains itself: tap for the full rule, status, and where to watch it. */
 function TriggerBadge({ label }: { label: string }) {
@@ -153,7 +153,7 @@ function EngineHelp({ styleId }: { styleId: string }) {  if (styleId === "breezy
         <p>This badge names the strategy this slot runs.</p>
         <dl>
           <dt>Universe</dt>
-          <dd>It fishes the 15-60 minute micro-breakout on BTC, ETH and SOL: through the 20-bar 15m high on 1.2x median volume.</dd>
+          <dd>It fishes the 15-60 minute micro-breakout on every liquid coin: through the 20-bar 15m high on 1.2x median volume.</dd>
           <dt>Rule-driven</dt>
           <dd>Jev is never asked — a 1-3s reasoning call is a lifetime at this timescale. The code takes the setup when it triggers.</dd>
           <dt>Exits</dt>
