@@ -49,8 +49,7 @@ spec refuses to pretend otherwise.
   BE-move at +0.3R with fee buffer.
 - **Time stop:** 45 minutes. A scalp still open at 45 minutes is a failed scalp: market-close it,
   log `time_stop`, no exceptions. (Grim rides to midnight; Scalpy gets an hour.)
-- **Cadence guards:** max 8 trades/day, $2/day fee budget, 15-minute cooldown between fills.
-  Flat is fine. Churn is the enemy, not idleness.
+- **Cadence guards:** 80 trades/day, $20/day fee budget (owner call 2026-09-28: 10x'd for data-gathering — count/budget caps censor the sample, so the gate is the 8% daily-loss stop + 40% retire line, i.e. percentage lost, not trades taken). 15-minute cooldown between fills stays as the anti-churn brake. Flat is fine. Churn is the enemy, not idleness.
 - **JEV:** never asked (see pre-review #4). Menus stay empty; status lines cite the rule.
   Revisit only if rule-driven expectancy is positive AND JEV-gated entries beat it in ghost.
 
