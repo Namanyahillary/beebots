@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { EquityChart } from "./EquityChart";
 import { Help } from "./Help";
 import { FillRow } from "./Fills";
@@ -69,6 +69,108 @@ interface Props {
 const STYLE_LABEL: Record<string, string> = { bizzy: "Breakout", breezy: "Trend", boozy: "Momentum", scalpy: "Scalp", fade: "Fade" };
 const DEFAULT_STYLE: Record<BeeName, string> = { bee1: "bizzy", bee2: "breezy", bee3: "boozy", bee4: "scalpy", bee5: "scalpy", bee6: "fade" };
 
+/** Per-trigger explainers: the chip tapped decides the content (used to be hardcoded Stinger for every chip). */
+const TRIGGER_INFO: Record<string, { title: string; head: string; body: ReactNode }> = {
+  stinger: {
+    title: "What is Stinger?",
+    head: "Stinger entry trigger",
+    body: (
+      <>
+        <p>Stinger is Grim second entry trigger, alongside the default Williams breakout.</p>
+        <dl>
+          <dt>Rule</dt>
+          <dd>Long only when price sits above the previous day high with rising volume.</dd>
+          <dt>Volume bar</dt>
+          <dd>Volume z-score at 1.0 or more. A starting guess, retuned from fills.</dd>
+          <dt>Williams differs</dt>
+          <dd>Williams fires at today open plus half of yesterday range. Either can trigger first on a fast morning.</dd>
+          <dt>Challenger</dt>
+          <dd>Stinger was copied from a leading Hive bee. It runs beside Williams, never instead of it. The menu labels keep them apart.</dd>
+          <dt>Scoreboard</dt>
+          <dd>Every fill records which trigger fired. Open the Setups panel to see offered versus picked counts per trigger.</dd>
+        </dl>
+        <p>No trigger fired yet means a quiet market, not a broken one.</p>
+      </>
+    ),
+  },
+  williams: {
+    title: "What is Williams?",
+    head: "Williams entry trigger",
+    body: (
+      <>
+        <p>Williams is Grim default entry trigger: the Larry Williams volatility breakout.</p>
+        <dl>
+          <dt>Rule</dt>
+          <dd>Long only when price breaks above today open plus half of yesterday range.</dd>
+          <dt>One shot</dt>
+          <dd>One trade a day, ridden to the UTC day close. A trigger more than 20bp past its line is a missed breakout, never chased.</dd>
+          <dt>Stinger differs</dt>
+          <dd>Stinger is the challenger at the previous day high on rising volume. Fills record which one fired.</dd>
+        </dl>
+        <p>No trigger fired yet means a quiet market, not a broken one.</p>
+      </>
+    ),
+  },
+  microbreakout: {
+    title: "What is the micro-breakout?",
+    head: "Micro-breakout entry trigger",
+    body: (
+      <>
+        <p>The micro-breakout is how Dash and Zip catch the 15-60 minute wiggle on every liquid coin.</p>
+        <dl>
+          <dt>Rule</dt>
+          <dd>Long only when price breaks above its 20-bar 15-minute high on 1.2x median volume, inside a 30bp chase guard.</dd>
+          <dt>Two wolves</dt>
+          <dd>Dash and Zip split setups by rotating first pick hourly, so they never mirror. One setup means whoever holds first pick takes it.</dd>
+          <dt>Wick tag</dt>
+          <dd>Entries label fresh (<span className="num">SCALP_XRP</span>) versus exhausted thrust (<span className="num">SCALP_XRP_XHT</span>) when the forming bar spiked and sagged. Attribution only — the code takes either one.</dd>
+          <dt>Scoreboard</dt>
+          <dd>Every fill records its trigger. Open the Setups panel to see offered versus picked counts, and the 30-scalp gate judges the playbook.</dd>
+        </dl>
+        <p>No trigger fired yet means a quiet market, not a broken one.</p>
+      </>
+    ),
+  },
+  crowdedlong: {
+    title: "What is crowded-long?",
+    head: "Crowded-long fade trigger",
+    body: (
+      <>
+        <p>Crowded-long is Rook short trigger: fading overcrowded longs.</p>
+        <dl>
+          <dt>Rule</dt>
+          <dd>Short only when the funding z-score hits +2 or more into a +8% 24-hour rally. The crowd is paying hard and the marginal buyer is in.</dd>
+          <dt>Wide stops</dt>
+          <dd>Crowds overshoot, so the stop sits at 2x ATR and the fade dies at 6 hours if it becomes a regime instead of an exhaustion.</dd>
+          <dt>Rare</dt>
+          <dd>Extremes only, a few times a week at most. Flat for days is expected, and the 20-fade gate judges the style.</dd>
+        </dl>
+        <p>No trigger fired yet means no crowd worth fading, not a broken one.</p>
+      </>
+    ),
+  },
+  washedoutshort: {
+    title: "What is washed-out-short?",
+    head: "Washed-out-short fade trigger",
+    body: (
+      <>
+        <p>Washed-out-short is Rook long trigger: buying capitulation.</p>
+        <dl>
+          <dt>Rule</dt>
+          <dd>Long only when the funding z-score hits -2 or worse into a -8% 24-hour washout. Crowded shorts paying hard into panic.</dd>
+          <dt>Wide stops</dt>
+          <dd>Capitulation overshoots, so the stop sits at 2x ATR and the fade dies at 6 hours if it becomes a regime instead of an exhaustion.</dd>
+          <dt>Rare</dt>
+          <dd>Extremes only, a few times a week at most. Flat for days is expected, and the 20-fade gate judges the style.</dd>
+        </dl>
+        <p>No trigger fired yet means no crowd worth fading, not a broken one.</p>
+      </>
+    ),
+  },
+};
+
+const triggerKey = (label: string) => label.toLowerCase().replace(/[^a-z]/g, "");
+
 /** A trigger chip that explains itself: tap for the full rule, status, and where to watch it. */
 function TriggerBadge({ label }: { label: string }) {
   const [open, setOpen] = useState(false);
@@ -78,9 +180,14 @@ function TriggerBadge({ label }: { label: string }) {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [open ]);
+  const info = TRIGGER_INFO[triggerKey(label)] ?? {
+    title: `What is ${label}?`,
+    head: `${label} entry trigger`,
+    body: <p>Entries fire from this trigger when its rule is met. Open the Setups panel to see offered versus picked counts per trigger.</p>,
+  };
   return (
     <>
-      <button type="button" className="trigger-badge" onClick={() => setOpen(true)} title="What is Stinger?">
+      <button type="button" className="trigger-badge" onClick={() => setOpen(true)} title={info.title}>
         {label}
       </button>
       {open && (
@@ -89,23 +196,8 @@ function TriggerBadge({ label }: { label: string }) {
             <button className="modal-x" onClick={() => setOpen(false)} aria-label="Close">
               ×
             </button>
-            <h2 id="stinger-title">Stinger entry trigger</h2>
-            <div className="help-body">
-              <p>Stinger is Grim second entry trigger, alongside the default Williams breakout.</p>
-              <dl>
-                <dt>Rule</dt>
-                <dd>Long only when price sits above the previous day high with rising volume.</dd>
-                <dt>Volume bar</dt>
-                <dd>Volume z-score at 1.0 or more. A starting guess, retuned from fills.</dd>
-                <dt>Williams differs</dt>
-                <dd>Williams fires at today open plus half of yesterday range. Either can trigger first on a fast morning.</dd>
-                <dt>Challenger</dt>
-                <dd>Stinger was copied from a leading Hive bee. It runs beside Williams, never instead of it. The menu labels keep them apart.</dd>
-                <dt>Scoreboard</dt>
-                <dd>Every fill records which trigger fired. Open the Setups panel to see offered versus picked counts per trigger.</dd>
-              </dl>
-              <p>No trigger fired yet means a quiet market, not a broken one.</p>
-            </div>
+            <h2 id="stinger-title">{info.head}</h2>
+            <div className="help-body">{info.body}</div>
           </div>
         </div>
       )}
