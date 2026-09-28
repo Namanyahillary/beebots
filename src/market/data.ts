@@ -1,7 +1,7 @@
 import { log } from "../log.js";
 import type { PublicApi } from "../okx/public.js";
 import { safeError } from "../redact.js";
-import { atr, bollinger, macd, pctChange, rsi, trendStats, zScore } from "./indicators.js";
+import { atr, bollinger, macd, median, pctChange, rsi, trendStats, zScore } from "./indicators.js";
 import type { Candle, CoinStats, Instrument, MarketView, Ticker } from "./types.js";
 import { gateUniverse } from "./universe.js";
 
@@ -36,6 +36,7 @@ export function computeStats(inst: Instrument, t: Ticker, c15: Candle[], c1h: Ca
   const confirmed1h = c1h.filter((c) => c.confirmed);
   const volLatest = confirmed1h[confirmed1h.length - 1]?.volUsd;
   const volHist = confirmed1h.slice(-169, -1).map((c) => c.volUsd);
+  const micro = microLevels(c15);
   return {
     instId: inst.instId,
     coin: inst.coin,
@@ -61,6 +62,7 @@ export function computeStats(inst: Instrument, t: Ticker, c15: Candle[], c1h: Ca
     oiChg1hPct: null,
     newsZ: null,
     sentiment: null,
+    micro,
   };
 }
 
@@ -212,6 +214,23 @@ export class MarketFeed {
       return c?.rates ?? [];
     }
   }
+}
+
+/** Micro-breakout channel (scalpy): highest high / lowest low of the last MICRO_DONCHIAN_N
+ *  confirmed 15m bars, plus the latest confirmed 15m volume vs its 24h median (96 bars).
+ *  Null until enough confirmed bars exist. */
+export const MICRO_DONCHIAN_N = 20;
+export const MICRO_VOL_MEDIAN_N = 96;
+
+export function microLevels(c15: Candle[]): { hiN: number; loN: number; volRatio: number | null } | null {
+  const done = c15.filter((c) => c.confirmed);
+  if (done.length < MICRO_DONCHIAN_N + 1) return null;
+  const win = done.slice(-MICRO_DONCHIAN_N - 1, -1);
+  const hiN = Math.max(...win.map((c) => c.h));
+  const loN = Math.min(...win.map((c) => c.l));
+  const latest = done[done.length - 1]!.volUsd;
+  const med = median(done.slice(-MICRO_VOL_MEDIAN_N - 1, -1).map((c) => c.volUsd));
+  return { hiN, loN, volRatio: med ? latest / med : null };
 }
 
 /** Larry Williams k: the trigger is today's open plus k x yesterday's high-low range (k = 0.5 in the source). */

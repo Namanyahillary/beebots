@@ -11,7 +11,7 @@ import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { dirname, join } from "node:path";
 import { z } from "zod";
-import { BEES } from "./config.js";
+import { BEES, SETUP_BEES } from "./config.js";
 import { hashPassword, MAX_PASSWORD, MIN_PASSWORD, readJson, send } from "./gate.js";
 import { checkJevKey } from "./jev.js";
 import { log } from "./log.js";
@@ -300,7 +300,8 @@ export class Setup {
         }
         const b = parsed.data;
         if (!b.openaiKey && !this.o.openai.apiKey) return send(res, 400, { error: "Your bees need an OpenAI key (it designs and paints them)." });
-        const missing = BEES.filter((slot) => imagePath(this.o.settingsPath, slot) === null);
+        // Only the three Setup-raised wolves need portraits; bee4 (built-in scalpy) shows the placeholder mark until painted.
+        const missing = SETUP_BEES.filter((slot) => imagePath(this.o.settingsPath, slot) === null);
         if (missing.length) return send(res, 400, { error: "Every bee needs its portrait before you start." });
         const jevErr = await this.checkJev(b.jevKey, this.o.jevModel);
         if (jevErr) return send(res, 400, { error: jevErr });

@@ -5,8 +5,8 @@ import { chmodSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSy
 import { dirname } from "node:path";
 import { z } from "zod";
 
-export const STYLES = ["bizzy", "breezy", "boozy"] as const;
-/** A trading style is one of the three built-in strategies, named after the bee that first traded it. */
+export const STYLES = ["bizzy", "breezy", "boozy", "scalpy"] as const;
+/** A trading style is one of the four built-in strategies, named after the bee that first traded it. */
 export type StyleId = (typeof STYLES)[number];
 
 export const STYLE_INFO: Record<StyleId, { label: string; blurb: string; name: string; tagline: string }> = {
@@ -28,9 +28,15 @@ export const STYLE_INFO: Record<StyleId, { label: string; blurb: string; name: s
     name: "Blaze",
     tagline: "the degen",
   },
+  scalpy: {
+    label: "Scalp",
+    blurb: "Fast day-trader: fishes the 15-60 minute micro-breakout on BTC, ETH and SOL. Small, frequent, out fast — rule-driven, Jev never asked.",
+    name: "Dash",
+    tagline: "the quick one",
+  },
 };
 
-/** The original three are the official wolves: owners' wolves may not use their names ("Blaze", "blaze-wolf", "Blaze Wolf"). */
+/** The original four are the official wolves: owners' wolves may not use their names ("Blaze", "blaze-wolf", "Blaze Wolf"). */
 const squash = (s: string) =>
   s
     .toLowerCase()
@@ -81,6 +87,7 @@ export const SettingsSchema = z.object({
   ownerPasswordHash: z.string().startsWith("scrypt$").optional(),
   /** When the operator ticked the risk statements on the Setup page. */
   acceptedRiskAt: z.number(),
+  /** Setup raises three custom wolves; the 4th slot (bee4, scalpy) is always the built-in fast day-trader. */
   bees: z.array(BeeSchema).length(3),
   /** The "Join the Hive?" answer on the Setup page (absent in files saved before the Hive existed). */
   hive: z.boolean().optional(),

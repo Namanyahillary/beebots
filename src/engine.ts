@@ -264,6 +264,17 @@ function ratchetStop(p: Position, cand: number): void {
   else p.stopPx = p.side === "long" ? Math.max(p.stopPx, cand) : Math.min(p.stopPx, cand);
 }
 
+/**
+ * Rule-driven proposal (scalpy): the menu carries at most one actionable
+ * option and the code takes it as-is — no Jev involved. Deterministic first
+ * entry order if a brain ever offers more than one; rule-driven brains offer
+ * one by construction. HOLD-only / empty menus mean hold.
+ */
+function ruleProposal(menu: Menu): Proposal | null {
+  const hit = Object.entries(menu).find(([, opt]) => opt.intent.kind !== "hold");
+  return hit ? { label: hit[0], intent: hit[1].intent, prob: 1, conviction: 2 } : null;
+}
+
 export class Engine {
   readonly bees = {} as Record<BeeId, BeeState>;
   private last = {} as Partial<Record<BeeId, LastDecision>>;
@@ -628,7 +639,7 @@ export class Engine {
 
   /**
    * Aggregate monitor (ALERT-ONLY, not a veto): per-instrument sum of open notional across
-   * the 3 bees vs the single-instrument cap (cfg.risk.maxNotionalUsdPerBee). Logs + alerts,
+    * the bees vs the single-instrument cap (cfg.risk.maxNotionalUsdPerBee). Logs + alerts,
    * zero trading effect.
    */
   private checkAggregateExposure(now: number): void {
@@ -679,9 +690,16 @@ private filterVenueMenu(menu: Menu, coins: string[]): Menu {
     let ruleHold: string | null = null;
     const dataAgeMs = now - this.d.feed.lastRefreshAt;
     const maxDataAgeMs = 3 * cfg.dataRefreshMs + 30_000;
+    // Rule-driven brains (scalpy) never consult Jev: flat with no setup is
+    // "no_options" (the watching pulse still fires), a triggered setup is
+    // "rule" (the code takes it below). Either way no API call is made.
+    const ruleDriven = brain.ruleDriven === true;
     if (jev.capTripped) jevStatus = "daily_cap";
     else if (Object.keys(menu).length === 0) jevStatus = "no_options";
-    else if (bee.position && brain.lockedHold) {
+    else if (ruleDriven) {
+      jevStatus = "rule";
+      this.jevSkipped[id] = (this.jevSkipped[id] ?? 0) + 1;
+    } else if (bee.position && brain.lockedHold) {
       // Rule-dictated hold (e.g. boozy's commit window with no double-down available):
       // the menu would be exactly {RIDE}, so asking Jev is pure spend. Risk still runs
       // below on every tick — stops, caps and vetoes fire in code either way.
@@ -692,7 +710,7 @@ private filterVenueMenu(menu: Menu, coins: string[]): Menu {
         this.jevSkipped[id] = (this.jevSkipped[id] ?? 0) + 1;
       }
     }
-    if (ruleHold === null && Object.keys(menu).length > 0) {
+    if (ruleHold === null && !ruleDriven && Object.keys(menu).length > 0) {
       if (jev.downSince !== null) {
       // Known outage: bypass the cache so the fail-closed path runs on a live answer.
       r = await jev.decide({ strategy: brain.strategy, state: snap.state, menu, convictionLabels: brain.convictionLabels });
@@ -730,12 +748,13 @@ private filterVenueMenu(menu: Menu, coins: string[]): Menu {
           ? { label: cached.choice, intent: menu[cached.choice]!.intent, prob: cached.prob, conviction: cached.conviction }
           : ruleHold !== null && menu.RIDE
             ? { label: "RIDE", intent: menu.RIDE.intent, prob: 1, conviction: 0 }
-            : null;
+            : ruleDriven
+              ? ruleProposal(menu)
+              : null;
 
     // Risk runs EVERY tick, cached or not: stops, caps, spread/funding vetoes and gates
     // all fire in code either way. Only the Jev API call is ever skipped.
-    const risk = applyRisk({
-      ctx,
+    const risk = applyRisk({      ctx,
       brain,
       proposal,
       jev: jevStatus,

@@ -1,13 +1,15 @@
 import { z } from "zod";
 import { STYLE_INFO, STYLES, type Settings, type StyleId } from "./settings.js";
 
-/** Three bee slots. Each one trades one of the three styles (settings.ts); two bees may share a style. */
-export const BEES = ["bee1", "bee2", "bee3"] as const;
+/** Four bee slots. bee1-3 trade the Setup wolves' styles (or the original three); bee4 always runs scalpy, the built-in fast day-trader. */
+export const BEES = ["bee1", "bee2", "bee3", "bee4"] as const;
 export type BeeId = (typeof BEES)[number];
 export { STYLES, type StyleId };
+/** Slots the Setup page raises and paints (bee4 is built-in and needs no portrait). */
+export const SETUP_BEES: ReadonlyArray<BeeId> = ["bee1", "bee2", "bee3"];
 
-/** With no Setup file (settings only from .env), the bees are the original three. */
-const DEFAULT_SLOTS: Record<BeeId, StyleId> = { bee1: "bizzy", bee2: "breezy", bee3: "boozy" };
+/** With no Setup file (settings only from .env), the bees are the original four. */
+const DEFAULT_SLOTS: Record<BeeId, StyleId> = { bee1: "bizzy", bee2: "breezy", bee3: "boozy", bee4: "scalpy" };
 /** Typed as the only acknowledgement that unlocks MODE=live. */
 export const LIVE_ACK_PHRASE = "I-ACCEPT-REAL-MONEY-RISK";
 
@@ -41,7 +43,7 @@ const opt = z
   .optional()
   .transform((v) => (v === undefined || v.trim() === "" ? undefined : v.trim()));
 
-// Per-style knobs: BIZZY_* = Breakout, BREEZY_* = Trend, BOOZY_* = Momentum. Every bee on that style uses them.
+// Per-style knobs: BIZZY_* = Breakout, BREEZY_* = Trend, BOOZY_* = Momentum, SCALPY_* = Scalp. Every bee on that style uses them.
 const perStyle = (prefix: string, d: { trades: number; fee: number; spread: number; cooldown: number; stopAtr: number; maxFlat: number }) => ({
   [`${prefix}_MAX_TRADES_PER_DAY`]: num(d.trades),
   [`${prefix}_FEE_BUDGET_USD_DAY`]: num(d.fee),
@@ -118,9 +120,11 @@ const EnvSchema = z.object({
   ...perStyle("BREEZY", { trades: 3, fee: 1.0, spread: 5, cooldown: 240, stopAtr: 2, maxFlat: 0 }),
   ...perStyle("BIZZY", { trades: 1, fee: 1.0, spread: 5, cooldown: 5, stopAtr: 1.5, maxFlat: 20 }),
   ...perStyle("BOOZY", { trades: 3, fee: 3.0, spread: 15, cooldown: 2, stopAtr: 2, maxFlat: 0 }),
+  ...perStyle("SCALPY", { trades: 8, fee: 2.0, spread: 5, cooldown: 15, stopAtr: 0.75, maxFlat: 0 }),
   ...perSlot("BEE1"),
   ...perSlot("BEE2"),
   ...perSlot("BEE3"),
+  ...perSlot("BEE4"),
   // Real money needs DRY_RUN=false, MODE=live AND this set to LIVE_ACK_PHRASE. Paper trading needs none of it.
   LIVE_ACK: opt,
 
@@ -341,7 +345,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, settings: Setti
       takerFeeRate: e.TAKER_FEE_RATE,
     },
     universe: { min24hVolUsd: e.MIN_24H_VOL_USD, allowNonCrypto: e.ALLOW_NON_CRYPTO },
-    bees: { bizzy: knobs("bizzy"), breezy: knobs("breezy"), boozy: knobs("boozy") },
+    bees: { bizzy: knobs("bizzy"), breezy: knobs("breezy"), boozy: knobs("boozy"), scalpy: knobs("scalpy") },
     breezy: { minOpenProb: e.BREEZY_MIN_OPEN_PROB, minSizeUsd: e.BREEZY_MIN_SIZE_USD },
     bizzy: { sizeFraction: e.BIZZY_SIZE_FRACTION, universeSize: e.BIZZY_UNIVERSE_SIZE, timeStopMinutes: e.BIZZY_TIME_STOP_MINUTES },
     boozy: { candidates: e.BOOZY_CANDIDATES },

@@ -66,8 +66,8 @@ interface Props {
   decisions?: DecisionEvent[];
 }
 
-const STYLE_LABEL: Record<string, string> = { bizzy: "Breakout", breezy: "Trend", boozy: "Momentum" };
-const DEFAULT_STYLE: Record<BeeName, string> = { bee1: "bizzy", bee2: "breezy", bee3: "boozy" };
+const STYLE_LABEL: Record<string, string> = { bizzy: "Breakout", breezy: "Trend", boozy: "Momentum", scalpy: "Scalp" };
+const DEFAULT_STYLE: Record<BeeName, string> = { bee1: "bizzy", bee2: "breezy", bee3: "boozy", bee4: "scalpy" };
 
 /** A trigger chip that explains itself: tap for the full rule, status, and where to watch it. */
 function TriggerBadge({ label }: { label: string }) {
@@ -147,6 +147,23 @@ function EngineHelp({ styleId }: { styleId: string }) {  if (styleId === "breezy
         <p>Watch this when you compare what each slot is built to do.</p>
       </Help>
     );
+  if (styleId === "scalpy")
+    return (
+      <Help title="Engine: Scalp">
+        <p>This badge names the strategy this slot runs.</p>
+        <dl>
+          <dt>Universe</dt>
+          <dd>It fishes the 15-60 minute micro-breakout on BTC, ETH and SOL: through the 20-bar 15m high on 1.2x median volume.</dd>
+          <dt>Rule-driven</dt>
+          <dd>Jev is never asked — a 1-3s reasoning call is a lifetime at this timescale. The code takes the setup when it triggers.</dd>
+          <dt>Exits</dt>
+          <dd>Trim half at +0.5R, close the rest at +1R, breakeven at +0.3R, and a 45-minute time stop shoots overstayers.</dd>
+          <dt>Gate</dt>
+          <dd>At 30 resolved scalps the book judges it: expectancy above zero net of fees keeps it, otherwise it is killed. No extensions.</dd>
+        </dl>
+        <p>Watch this when you compare what each slot is built to do.</p>
+      </Help>
+    );
   return (
     <Help title="Engine: Breakout">
       <p>This badge names the strategy this slot runs.</p>
@@ -177,7 +194,7 @@ export function BeeColumn({ name, bee, curve, baseline, rank, gap, flash, fills,
   const [showFills, setShowFills] = useState(false);
   const [sel, setSel] = useState<FillEvent | null>(null);
   const beeFills = (fills ?? []).filter((f) => f.bee === name);
-  // Structured idle state for a flat waiting bee (bizzy only, for now): drives
+  // Structured idle state for a flat waiting bee (bizzy and scalpy): drives
   // the proximity bar. Absent = today's flat line exactly, no layout shift.
   const idle = !p ? (bee?.last?.idle ?? null) : null;
 

@@ -76,6 +76,14 @@ export function pctChange(from: number | undefined, to: number | undefined): num
   return ((to - from) / from) * 100;
 }
 
+/** Median of a numeric sample (null when empty). */
+export function median(xs: number[]): number | null {
+  if (!xs.length) return null;
+  const s = [...xs].sort((a, b) => a - b);
+  const m = Math.floor(s.length / 2);
+  return s.length % 2 ? s[m]! : (s[m - 1]! + s[m]!) / 2;
+}
+
 export function zScore(latest: number, history: number[]): number | null {
   if (history.length < 5) return null;
   const m = history.reduce((a, b) => a + b, 0) / history.length;

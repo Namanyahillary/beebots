@@ -1,0 +1,78 @@
+# SCALPY — fast day-trader (4th style, proposed)
+
+Status: LIVE since 2026-09-28 (bee4 "Dash"). Decision gate at 30 resolved scalps — see docs/PROFIT_MODE.md.
+Built as specced with two deltas: (1) entries run through a new generic `ruleDriven`
+engine path (single setup taken as-is, zero Jev calls, all code gates still fire);
+(2) a 30bp chase guard on the micro-high (post-SOL consensus: market-take within,
+never chase past). Sizing floor bites immediately on small books (~1.5% risk on $333)
+— flagged for the 30-scalp review.
+
+## Thesis (one paragraph)
+
+The three wolves leave a gap at the fast end: Grim takes one breakout a day, Silver rides
+multi-hour trends, Blaze holds for 24h+. Nothing fishes the 15–60 minute wiggle — small,
+frequent, out fast. Scalpy fills that slot with single-position scalps: TP ladder set short
+(+0.5R trim, +1R out), hard stops, time stops that shoot overstayers. It is a *fast
+day-trader*, not HFT: 10s engine ticks over REST cannot do seconds-level scalping, and the
+spec refuses to pretend otherwise.
+
+## Adversarial pre-review (why it might fail)
+
+1. **Fee wall.** 5bp taker each way = $0.30–0.60 per round trip on $300–600 notionals.
+   Targets below $5 are fee-donated (30–60% tax). Floor: $5 minimum target, enforced by sizing.
+2. **No queue edge.** Real scalping lives on spread/queue position; a 10s REST bot has neither.
+   Edge must come from short-horizon momentum selection, which is the weakest-documented edge
+   in the building. Prior: skeptical.
+3. **Overtrading.** High trade caps + boredom = churn. Cooldowns and the fee budget are load-bearing,
+   not decoration.
+4. **JEV latency.** A 1–3s reasoning call per scalp is a lifetime at this timescale. JEV stays out
+   (rule-driven entries, status shows the rule). This is a deliberate, logged exception to
+   "JEV chooses" — speed outranks deliberation here, and the measurement will confirm or kill it.
+
+## Rules (starting guesses — every number below is guilty until measured)
+
+- **Universe:** BTC, ETH, SOL. Tightest spreads, deepest books. HYPE excluded until spreads prove out.
+- **Entry (micro-breakout):** 15-minute Donchian break (highest high / lowest low, longs only —
+  venue reality + shorting microstructure unproven) with spread gate ≤ 5bp and 15m volume ≥
+  1.2× its 24h median. One setup, no discretion, no forcing (`neverForce: true`).
+- **Size:** risk 0.5% of book equity per scalp, stop-distance sized (same risk-normalized
+  machinery as Blaze: `size = riskUsd / stopDistancePct`). Small by construction.
+- **Stop:** 0.75× ATR(15m) from entry, hard, set at fill. No widening, ever.
+- **Exits (ladder, reuses takeProfit machinery):** trim 50% at +0.5R, close the rest at +1R.
+  BE-move at +0.3R with fee buffer (tight on purpose — scalps give back fast).
+- **Time stop:** 45 minutes. A scalp still open at 45 minutes is a failed scalp: market-close it,
+  log `time_stop`, no exceptions. (Grim rides to midnight; Scalpy gets an hour.)
+- **Cadence guards:** max 8 trades/day, $2/day fee budget, 15-minute cooldown between fills.
+  Flat is fine. Churn is the enemy, not idleness.
+- **JEV:** never asked (see pre-review #4). Menus stay empty; status lines cite the rule.
+  Revisit only if rule-driven expectancy is positive AND JEV-gated entries beat it in ghost.
+
+## Measurement (same lens as every bee)
+
+- Per-trade: R-multiple, fee paid, fee/R ratio, hold minutes, setup tag (`micro-long` only at first).
+- Review weekly: expectancy net of fees, win rate, avg winner/loser R, fee drag as % of gross.
+- **Decision gate at 30 resolved scalps:** expectancy > 0 net of fees → keep, consider sizing up
+  toward 1% risk. Expectancy ≤ 0 → kill the style, journal the postmortem. No extensions, no excuses.
+
+## Implementation checklist (when the gate says build)
+
+1. `src/settings.ts`: STYLES += "scalpy", STYLE_INFO entry (name crawling: needs a wolf name +
+   portrait; until painted, placeholder mark via BEE_MARK_URL).
+2. `src/config.ts`: BEES += "bee4", DEFAULT_SLOTS, perSlot("BEE4") (OKX + Alpaca keys),
+   perStyle("SCALPY", { trades: 8, fee: 2.0, spread: 5, cooldown: 15, stopAtr: 0.75, maxFlat: 0 }).
+3. `src/bees/scalpy.ts`: brain (micro-breakout universe/menu, sizing, stops, takeProfit ladder,
+   45m time stop, neverForce, no JEV menu — empty menu + idleStatus/idleDetail with watched price).
+4. `src/bees/index.ts`: BRAINS += scalpy. Engine is BEES-generic (decide/risk/reconcile/ledger
+   all loop slots) — no engine changes expected; verify ghost/scout loops too.
+5. Dashboard: BEE_NAMES/BEE_META += bee4, 4th column CSS, board/sort generic-check, Hive report
+   bee loop, portrait placeholder.
+6. Risk: no new gates (existing caps/stops/vetoes cover it); venue gates apply automatically in paper.
+7. Tests: brain unit (entry/TP/ladder/time-stop/cooldowns), sizing floor ($5 target ⇒ min notional
+   check), 30-scalp gate is a human review, not code.
+8. Docs: PROFIT_MODE.md entry + this file flips to Status: LIVE.
+
+## Explicit non-goals (refused in this spec)
+
+- Multiple concurrent positions (architecture surgery before evidence — refused; revisit only if
+  single-position expectancy is positive AND one slot demonstrably bottlenecks it).
+- Sub-$5 targets, short scalps, JEV-in-the-loop entries, forcing entries while flat.

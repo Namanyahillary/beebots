@@ -394,6 +394,7 @@ describe("paper venue gates (Alpaca spot: long-only, allowlisted coins)", () => 
     BEE1_ALPACA_API_KEY: "k1", BEE1_ALPACA_API_SECRET: "s1",
     BEE2_ALPACA_API_KEY: "k2", BEE2_ALPACA_API_SECRET: "s2",
     BEE3_ALPACA_API_KEY: "k3", BEE3_ALPACA_API_SECRET: "s3",
+    BEE4_ALPACA_API_KEY: "k4", BEE4_ALPACA_API_SECRET: "s4",
   });
   const paperCtx = (b: ReturnType<typeof bee>, v: ReturnType<typeof view>) => ctx("bizzy", b, v, paperCfg());
   it("lets a long on an allowlisted coin through the venue gate", () => {

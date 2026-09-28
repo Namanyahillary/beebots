@@ -159,6 +159,14 @@ export interface BeeBrain {
   /** This bee waits for its setup instead of being forced in when flat (drama rule 2 does not apply). */
   neverForce?: boolean;
   /**
+   * Rule-driven entries: the menu carries at most one actionable option and the
+   * engine takes it (or holds) WITHOUT asking Jev — for timescales where a
+   * 1-3s reasoning call costs more than it buys. Stops, caps, vetoes, TP/BE
+   * and time stops all still fire in code every tick; only the Jev call is
+   * skipped. A deliberate, logged exception to "Jev chooses".
+   */
+  ruleDriven?: boolean;
+  /**
    * Rule-determined hold: when non-null (a human-readable reason), the code — not Jev —
    * dictates holding this tick (e.g. a commit window with no other available move).
    * The engine still runs full risk evaluation (stops/caps/vetoes fire); only the Jev

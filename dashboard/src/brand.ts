@@ -41,6 +41,8 @@ export const BRAND = {
     slot2Glow: "rgba(148, 163, 184, 0.45)",
     slot3: "#dc2626",
     slot3Glow: "rgba(220, 38, 38, 0.45)",
+    slot4: "#8b5cf6",
+    slot4Glow: "rgba(139, 92, 246, 0.45)",
   },
 
   /** Fragment for OpenAI image generator to create wolf character portraits in matching style */
@@ -74,6 +76,15 @@ export const BRAND = {
       color: "var(--boozy)",
       glow: "var(--boozy-glow)",
       img: "/bees/blaze.jpg",
+    },
+    bee4: {
+      name: "Dash",
+      tagline: "the quick one",
+      styleLabel: "Scalp",
+      blurb: "Fast day-trader: fishes the 15-60 minute micro-breakout on BTC, ETH and SOL. Small, frequent, out fast.",
+      color: "var(--scalpy)",
+      glow: "var(--scalpy-glow)",
+      img: "/bees/scalpy.jpg",
     },
   },
 
