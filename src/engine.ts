@@ -815,7 +815,9 @@ private filterVenueMenu(menu: Menu, coins: string[]): Menu {
     const costUsd = r && r.ok ? r.costUsd : 0;
     // Rule-dictated hold IS a decision (RIDE) — just not one Jev made. Show it as
     // such instead of "no call"; jev status + status text say who decided.
-    const shownChoice = r && r.ok ? r.choice : (cached?.choice ?? (ruleHold !== null ? "RIDE" : null));
+    // (Rule-driven takes show their setup label the same way, so the Setups
+    // scoreboard can count picks.)
+    const shownChoice = r && r.ok ? r.choice : (cached?.choice ?? proposal?.label ?? null);
     const decisionId = db.insertDecision({
       bee: id,
       ts: now,

@@ -30,6 +30,7 @@ describe("triggerScoreboard (GET /setups)", () => {
       db.insertEvent(ts, "decision", JSON.stringify({ type: "decision", ts, bee: "bee4", menu, choice, status }));
     ev(100, ["SCALP_BTC"], "SCALP_BTC");
     ev(200, ["SCALP_ETH"], null, "wanted SCALP_ETH, code said no: cooldown 4m"); // status mentions don't count
+    ev(250, [], null, "wanted SCALP_XRP, code said no: cooldown 4m"); // veto prose with an empty menu: invisible
     ev(300, ["LONG_BTC"], "LONG_BTC"); // no trigger label: invisible
     ev(400, ["SCALP_BTC"], "SCALP_BTC");
     ev(500, ["BREAKOUT_SOL", "WAIT"], "WAIT");

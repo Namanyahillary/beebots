@@ -317,9 +317,11 @@ export class Db {
    * (STINGER_/BREAKOUT_/SCALP_/FADE_) over recent trigger-bearing decisions.
    * Powers GET /setups — the dashboard panel can't live on the live window
    * alone (50 rows ≈ 90 seconds across six bees; triggers are rare events).
+   * The LIKE prefilter anchors on `"menu":["` so veto/status prose that merely
+   * mentions a label ("wanted SCALP_X, code said no") never counts.
    */
   triggerScoreboard(limit = 200): Array<{ label: string; offered: number; picked: number; lastSeen: number }> {
-    const like = (t: string) => `json LIKE '%${t}%'`;
+    const like = (t: string) => `json LIKE '%"menu":["%${t}%'`;
     const rows = this.raw
       .prepare(`SELECT json FROM events WHERE type = 'decision' AND (${like("STINGER_")} OR ${like("BREAKOUT_")} OR ${like("SCALP_")} OR ${like("FADE_")}) ORDER BY id DESC LIMIT ?`)
       .all(limit) as Array<{ json: string }>;

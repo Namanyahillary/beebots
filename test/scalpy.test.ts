@@ -223,18 +223,19 @@ describe("ruleDriven decide: the code takes the setup, Jev is never called", () 
     const exec = new SimExecutor(() => ({ tickers: V.tickers, instruments: V.instruments }), 0.0005, () => now);
     const engine = new Engine({ cfg, db, feed, jev, exec, bus, alerts: new Alerts(undefined), now: () => now });
     engine.bees[slot] = { ...bee("scalpy"), id: slot };
-    type E = { decide(id: string, now: number): Promise<void>; jevMade: Record<string, number>; last: Record<string, { status: string }> };
+    type E = { decide(id: string, now: number): Promise<void>; jevMade: Record<string, number>; last: Record<string, { status: string; choice: string | null }> };
     const e = engine as unknown as E;
-    return { decide: (t: number) => e.decide(slot, t), made: () => e.jevMade[slot] ?? 0, status: () => e.last[slot]?.status ?? "", engine };
+    return { decide: (t: number) => e.decide(slot, t), made: () => e.jevMade[slot] ?? 0, status: () => e.last[slot]?.status ?? "", choice: () => e.last[slot]?.choice ?? null, engine };
   }
   it("opens SCALP_BTC with zero Jev calls", async () => {
     // Odd UTC hour → bee4 holds first pick on the single setup.
     const odd = NOW + 3_600_000;
-    const { decide, made, status, engine } = await scalpyHarness(100, "bee4", odd);
+    const { decide, made, status, choice, engine } = await scalpyHarness(100, "bee4", odd);
     await decide(odd);
     expect(made()).toBe(0);
     expect(engine.bees["bee4"]!.position?.coin).toBe("BTC");
     expect(status()).toContain("SCALP_BTC");
+    expect(choice()).toBe("SCALP_BTC"); // takes record their setup (Setups scoreboard counts picks)
   });
   it("flat with no trigger: zero Jev calls, status watches the micro-high", async () => {
     const { decide, made, status, engine } = await scalpyHarness(99);
