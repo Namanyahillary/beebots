@@ -77,20 +77,24 @@ describe("thrustState (wick-exhaustion tag, attribution only)", () => {
     expect(t.exhausted).toBe(false);
   });
   it("menu labels the exhausted entry _XHT and takes it anyway (tag, not veto)", () => {
+    // Odd UTC hour → Dash holds first pick.
+    const odd = NOW + 3_600_000;
     const v = view([coin("BTC", { micro: { ...base, formingHigh: 100.5, volRatio: 1.5 } }, 100.15)]);
-    const m = scalpy.menu(ctx("scalpy", bee("scalpy"), v));
+    const m = scalpy.menu(ctx("scalpy", bee("scalpy"), v, testConfig(), odd));
     expect(Object.keys(m)).toEqual(["SCALP_BTC_XHT"]);
     expect(m.SCALP_BTC_XHT!.intent).toMatchObject({ kind: "open", side: "long" });
     expect(m.SCALP_BTC_XHT!.desc).toContain("wick");
     const fresh = view([coin("ETH", { micro: { ...base, formingHigh: 100.1, volRatio: 1.5 } }, 100.09)]);
-    expect(Object.keys(scalpy.menu(ctx("scalpy", bee("scalpy"), fresh)))).toEqual(["SCALP_ETH"]);
+    expect(Object.keys(scalpy.menu(ctx("scalpy", bee("scalpy"), fresh, testConfig(), odd)))).toEqual(["SCALP_ETH"]);
   });
 });
 
 describe("scalpy menu (one setup, or nothing)", () => {
   const wide = { micro: { hiN: 99.8, loN: 98, volRatio: 1.5 } };
   it("flat with a trigger offers exactly one SCALP_<coin>, strict", () => {
-    const m = scalpy.menu(ctx("scalpy", bee("scalpy"), view([coin("BTC", wide, 100)])));
+    // Odd UTC hour → Dash holds first pick.
+    const c = ctx("scalpy", bee("scalpy"), view([coin("BTC", wide, 100)]), testConfig(), NOW + 3_600_000);
+    const m = scalpy.menu(c);
     expect(Object.keys(m)).toEqual(["SCALP_BTC"]);
     expect(m.SCALP_BTC!.intent).toMatchObject({ kind: "open", side: "long", setup: "strict" });
   });
@@ -198,7 +202,7 @@ describe("scalpy status (idle lines, no Jev spend)", () => {
 });
 
 describe("ruleDriven decide: the code takes the setup, Jev is never called", () => {
-  async function scalpyHarness(px: number, slot: "bee4" | "bee5" = "bee4") {
+  async function scalpyHarness(px: number, slot: "bee4" | "bee5" = "bee4", now = NOW) {
     const { Db } = await import("../src/db.js");
     const { EventBus } = await import("../src/events.js");
     const { SimExecutor } = await import("../src/exec/executor.js");
@@ -210,22 +214,24 @@ describe("ruleDriven decide: the code takes the setup, Jev is never called", () 
     const bus = new EventBus(db);
     const btc = coin("BTC", { micro: { hiN: 99.8, loN: 98, volRatio: 1.5 } }, px);
     const V = view([btc]);
-    const feed = { view: () => V, lastRefreshAt: NOW } as never;
+    const feed = { view: () => V, lastRefreshAt: now } as never;
     const jev = new Jev({
       apiKey: "k", model: "m", timeoutMs: 2000, dailyUsdCap: 5, usdPerMTok: 0.042,
       client: { async systemOne(): Promise<never> { throw new Error("Jev must never be asked for a rule-driven bee"); } },
-      now: () => NOW,
+      now: () => now,
     });
-    const exec = new SimExecutor(() => ({ tickers: V.tickers, instruments: V.instruments }), 0.0005, () => NOW);
-    const engine = new Engine({ cfg, db, feed, jev, exec, bus, alerts: new Alerts(undefined), now: () => NOW });
-    engine.bees[slot] = bee("scalpy");
+    const exec = new SimExecutor(() => ({ tickers: V.tickers, instruments: V.instruments }), 0.0005, () => now);
+    const engine = new Engine({ cfg, db, feed, jev, exec, bus, alerts: new Alerts(undefined), now: () => now });
+    engine.bees[slot] = { ...bee("scalpy"), id: slot };
     type E = { decide(id: string, now: number): Promise<void>; jevMade: Record<string, number>; last: Record<string, { status: string }> };
     const e = engine as unknown as E;
     return { decide: (t: number) => e.decide(slot, t), made: () => e.jevMade[slot] ?? 0, status: () => e.last[slot]?.status ?? "", engine };
   }
   it("opens SCALP_BTC with zero Jev calls", async () => {
-    const { decide, made, status, engine } = await scalpyHarness(100);
-    await decide(NOW);
+    // Odd UTC hour → bee4 holds first pick on the single setup.
+    const odd = NOW + 3_600_000;
+    const { decide, made, status, engine } = await scalpyHarness(100, "bee4", odd);
+    await decide(odd);
     expect(made()).toBe(0);
     expect(engine.bees["bee4"]!.position?.coin).toBe("BTC");
     expect(status()).toContain("SCALP_BTC");
