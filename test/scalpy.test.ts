@@ -135,9 +135,9 @@ describe("scalpy exits (ladder + BE + 45m time stop)", () => {
     expect(sig.moveStopToBe).toBe(true);
     expect(sig.trim).toBeUndefined();
   });
-  it("trim half at +0.5R, close the rest at +1R", () => {
-    expect(takeProfitSignal(mk(), 0.5, pol)?.trim).toEqual({ fraction: 0.5 });
-    expect(takeProfitSignal(mk({ trimmedAtR: 0.5, beMoved: true }), 1.0, pol)?.trim).toEqual({ fraction: 1.0, ladder: true });
+  it("trim half at +0.4R, close the rest at +0.8R (= $3 on $5 risk)", () => {
+    expect(takeProfitSignal(mk(), 0.4, pol)?.trim).toEqual({ fraction: 0.5 });
+    expect(takeProfitSignal(mk({ trimmedAtR: 0.4, beMoved: true }), 0.8, pol)?.trim).toEqual({ fraction: 1.0, ladder: true });
   });
   it("time stop is 45 minutes", () => {
     expect(scalpy.timeStopMinutes!(ctx("scalpy", bee("scalpy"), view([])))).toBe(SCALPY_TIME_STOP_MIN);

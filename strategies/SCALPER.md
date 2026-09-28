@@ -45,8 +45,8 @@ spec refuses to pretend otherwise.
 - **Size:** risk 0.5% of book equity per scalp, stop-distance sized (same risk-normalized
   machinery as Blaze: `size = riskUsd / stopDistancePct`). Small by construction.
 - **Stop:** 0.75× ATR(15m) from entry, hard, set at fill. No widening, ever.
-- **Exits (ladder, reuses takeProfit machinery):** trim 50% at +0.5R, close the rest at +1R.
-  BE-move at +0.3R with fee buffer (tight on purpose — scalps give back fast).
+- **Exits (ladder, reuses takeProfit machinery):** trim 50% at +0.4R, close the rest at +0.8R — a full run banks 0.6R ($3 on $5 risk). Owner call 2026-09-28: bank the certain $3 rather than watch +$2 retrace to scratch (trade #1 did exactly that).
+  BE-move at +0.3R with fee buffer.
 - **Time stop:** 45 minutes. A scalp still open at 45 minutes is a failed scalp: market-close it,
   log `time_stop`, no exceptions. (Grim rides to midnight; Scalpy gets an hour.)
 - **Cadence guards:** max 8 trades/day, $2/day fee budget, 15-minute cooldown between fills.

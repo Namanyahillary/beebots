@@ -157,7 +157,7 @@ function EngineHelp({ styleId }: { styleId: string }) {  if (styleId === "breezy
           <dt>Rule-driven</dt>
           <dd>Jev is never asked — a 1-3s reasoning call is a lifetime at this timescale. The code takes the setup when it triggers.</dd>
           <dt>Exits</dt>
-          <dd>Trim half at +0.5R, close the rest at +1R, breakeven at +0.3R, and a 45-minute time stop shoots overstayers.</dd>
+          <dd>Trim half at +0.4R, close the rest at +0.8R (a full run banks 0.6R — $3 on $5 risk), breakeven at +0.3R, and a 45-minute time stop shoots overstayers.</dd>
           <dt>Gate</dt>
           <dd>At 30 resolved scalps the book judges it: expectancy above zero net of fees keeps it, otherwise it is killed. No extensions.</dd>
         </dl>

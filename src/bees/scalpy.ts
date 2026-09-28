@@ -84,7 +84,7 @@ export const scalpy: BeeBrain = {
   id: "scalpy",
   triggers: ["micro-breakout"],
   strategy:
-    "You are scalpy-bee, the fast day-trader. You fish the 15-60 minute wiggle on every liquid coin: when the price breaks above its 20-bar 15-minute high on 1.2x median volume, inside a 30bp chase guard, you take it long at risk-normalized size with a 0.75x ATR stop, trim half at +0.5R, close the rest at +1R, and time-stop anything alive at 45 minutes. Small, frequent, out fast. (Rule-driven: the code executes this, Jev is never asked.)",
+    "You are scalpy-bee, the fast day-trader. You fish the 15-60 minute wiggle on every liquid coin: when the price breaks above its 20-bar 15-minute high on 1.2x median volume, inside a 30bp chase guard, you take it long at risk-normalized size with a 0.75x ATR stop, trim half at +0.4R, close the rest at +0.8R, and time-stop anything alive at 45 minutes. Small, frequent, out fast. (Rule-driven: the code executes this, Jev is never asked.)",
   convictionLabels: ["cold", "warm", "hot", "gone"],
   neverForce: true,
   requiresStrictSetup: true,
@@ -169,9 +169,13 @@ export const scalpy: BeeBrain = {
     return atrStop(ctx.view.stats.get(instId), side, entryPx, ctx.knobs.stopAtrMult);
   },
 
-  // Trim half at +0.5R, close the rest at +1R (ladder rung frac 1.0 = full exit
-  // through the existing trim path), BE at +0.3R with a tight fee buffer —
-  // scalps give back fast. trimAtR > breakevenAtR so BE fires on its own
-  // (trimFirst = false).
-  takeProfit: { trimAtR: 0.5, trimFrac: 0.5, breakevenAtR: 0.3, feeBufferR: 0.05, ladder: { everyR: 0.5, frac: 1.0 } },
+  // Bank early (owner call 2026-09-28 — watching +$2 retrace to scratch is a
+  // worse outcome than a smaller certain bank): trim half at +0.4R, close the
+  // rest at +0.8R (ladder rung frac 1.0 = full exit through the existing trim
+  // path). A full run banks 0.6R = $3 on $5 risk. BE at +0.3R with a tight fee
+  // buffer — trimAtR > breakevenAtR so BE fires on its own (trimFirst = false).
+  // Honest cost: winners shrink ($3 vs $3.75) while stops stay $5, so the
+  // required win rate rises (~63% vs ~57%) — paid for far fewer retrace-to-scratch
+  // endings. The 30-scalp review judges the trade.
+  takeProfit: { trimAtR: 0.4, trimFrac: 0.5, breakevenAtR: 0.3, feeBufferR: 0.05, ladder: { everyR: 0.4, frac: 1.0 } },
 };
