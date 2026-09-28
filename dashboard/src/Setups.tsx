@@ -1,10 +1,10 @@
-import { memo, useMemo } from "react";
+import { memo, useEffect, useMemo, useState } from "react";
 import { useCollapsed } from "./collapse";
 import { Help } from "./Help";
 import { scoutAge } from "./Scout";
 import type { DecisionEvent } from "./types";
 
-const TRIGGER = /^(STINGER|BREAKOUT|SCALP)_/;
+const TRIGGER = /^(STINGER|BREAKOUT|SCALP|FADE)_/;
 const WINDOW = 50;
 
 interface SetupRow {
@@ -14,16 +14,35 @@ interface SetupRow {
   lastSeen: number;
 }
 
-/** Where Stinger is working: trigger labels offered to Jev recently, how often each won, and when each was last seen. */
+/**
+ * Trigger scoreboard: seeded from GET /setups (last 200 trigger-bearing
+ * decisions, all time) and extended with live ticks newer than the seed, so a
+ * rare trigger stays visible instead of aging out of a 90-second live window.
+ */
 export const Setups = memo(function Setups({ decisions }: { decisions: DecisionEvent[] }) {
+  const [seed, setSeed] = useState<SetupRow[]>([]);
+  useEffect(() => {
+    let alive = true;
+    fetch("/setups", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : []))
+      .then((j) => alive && Array.isArray(j) && setSeed(j))
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, []);
+
   const { rows, waits, holds, n } = useMemo(() => {
-    const view = (decisions ?? []).slice(0, WINDOW);
     const byLabel = new Map<string, SetupRow>();
+    for (const r of seed) byLabel.set(r.label, { ...r });
+    const seedMax = seed.reduce((a, r) => Math.max(a, r.lastSeen), 0);
+    const view = (decisions ?? []).slice(0, WINDOW);
     let waits = 0;
     let holds = 0;
     for (const d of view) {
       if (d.choice === "WAIT") waits++;
       if (d.choice === "HOLD") holds++;
+      if (d.ts <= seedMax) continue; // already counted in the seed
       for (const label of d.menu ?? []) {
         if (!TRIGGER.test(label)) continue;
         const row = byLabel.get(label) ?? { label, offered: 0, picked: 0, lastSeen: 0 };
@@ -34,7 +53,7 @@ export const Setups = memo(function Setups({ decisions }: { decisions: DecisionE
       }
     }
     return { rows: [...byLabel.values()].sort((a, b) => b.lastSeen - a.lastSeen), waits, holds, n: view.length };
-  }, [decisions]);
+  }, [decisions, seed]);
 
   const now = Date.now();
   const [collapsed, collapseBtn] = useCollapsed("setups");
@@ -43,14 +62,18 @@ export const Setups = memo(function Setups({ decisions }: { decisions: DecisionE
       <div className="rail-head">
         <span className="eyebrow">
           Setups <Help title="Setups">
-            <p>Setups shows Breakout triggers the wolf asked Jev about after price passed them.</p>
+            <p>Setups shows entry triggers offered across recent history: Breakout and Stinger for Grim, micro-breakouts for Dash and Zip, fades for Rook.</p>
             <dl>
               <dt>Record</dt>
-              <dd>Each row counts how often a Jev menu trigger was offered and picked across the last 50 decisions with its last seen age.</dd>
+              <dd>Each row counts how often a trigger was offered and picked, seeded from the last 200 trigger-bearing decisions and extended live, with its last seen age.</dd>
               <dt>Breakout</dt>
               <dd>This Williams trigger fires at today open plus half of yesterday range as a strict long open.</dd>
               <dt>Stinger</dt>
               <dd>This challenger fires above the prior day high on rising volume with volZ at 1.0 or more as a strict long open.</dd>
+              <dt>Scalp</dt>
+              <dd>Dash and Zip take 15-minute micro-breakouts; _XHT marks an exhausted-thrust entry (attribution only).</dd>
+              <dt>Fade</dt>
+              <dd>Rook fades crowded funding: FADE_SHORT into overcrowded longs, FADE_LONG into washed-out shorts.</dd>
               <dt>Flat picks</dt>
               <dd>Wait marks flat and waiting ticks and hold marks keep the position ticks.</dd>
               <dt>Quiet panel</dt>
@@ -59,7 +82,7 @@ export const Setups = memo(function Setups({ decisions }: { decisions: DecisionE
             <p>Watch fill labels to see which trigger earned.</p>
           </Help>
         </span>
-        <span className="num dim">last {n}</span>
+        <span className="num dim">last {n} live</span>
         {collapseBtn}
       </div>
       {!collapsed && (
@@ -77,7 +100,7 @@ export const Setups = memo(function Setups({ decisions }: { decisions: DecisionE
           ))}
         </div>
       ) : (
-        <div className="dim">no STINGER/BREAKOUT triggers in view</div>
+        <div className="dim">no entry triggers in view</div>
       )}
       <div className="setups-context num dim">
         WAIT ×{waits} · HOLD ×{holds}

@@ -23,6 +23,26 @@ describe("ghost_decisions (never executed)", () => {
   });
 });
 
+describe("triggerScoreboard (GET /setups)", () => {
+  it("counts offered/picked per trigger label over trigger-bearing decisions", () => {
+    const db = new Db(":memory:");
+    const ev = (ts: number, menu: string[], choice: string | null, status = "") =>
+      db.insertEvent(ts, "decision", JSON.stringify({ type: "decision", ts, bee: "bee4", menu, choice, status }));
+    ev(100, ["SCALP_BTC"], "SCALP_BTC");
+    ev(200, ["SCALP_ETH"], null, "wanted SCALP_ETH, code said no: cooldown 4m"); // status mentions don't count
+    ev(300, ["LONG_BTC"], "LONG_BTC"); // no trigger label: invisible
+    ev(400, ["SCALP_BTC"], "SCALP_BTC");
+    ev(500, ["BREAKOUT_SOL", "WAIT"], "WAIT");
+    const rows = db.triggerScoreboard();
+    expect(rows).toEqual([
+      { label: "BREAKOUT_SOL", offered: 1, picked: 0, lastSeen: 500 },
+      { label: "SCALP_BTC", offered: 2, picked: 2, lastSeen: 400 },
+      { label: "SCALP_ETH", offered: 1, picked: 0, lastSeen: 200 },
+    ]);
+    db.close();
+  });
+});
+
 describe("bee_state position migration", () => {
   it("defaults trimmedAtR/beMoved on old rows and preserves set values", () => {
     const db = new Db(":memory:");

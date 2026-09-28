@@ -312,6 +312,39 @@ export class Db {
     this.raw.prepare(`DELETE FROM events WHERE ts < ?`).run(olderThanTs);
   }
 
+  /**
+   * Trigger scoreboard: offered/picked counts per entry-trigger label
+   * (STINGER_/BREAKOUT_/SCALP_/FADE_) over recent trigger-bearing decisions.
+   * Powers GET /setups — the dashboard panel can't live on the live window
+   * alone (50 rows ≈ 90 seconds across six bees; triggers are rare events).
+   */
+  triggerScoreboard(limit = 200): Array<{ label: string; offered: number; picked: number; lastSeen: number }> {
+    const like = (t: string) => `json LIKE '%${t}%'`;
+    const rows = this.raw
+      .prepare(`SELECT json FROM events WHERE type = 'decision' AND (${like("STINGER_")} OR ${like("BREAKOUT_")} OR ${like("SCALP_")} OR ${like("FADE_")}) ORDER BY id DESC LIMIT ?`)
+      .all(limit) as Array<{ json: string }>;
+    const re = /^(STINGER|BREAKOUT|SCALP|FADE)_/;
+    const by = new Map<string, { label: string; offered: number; picked: number; lastSeen: number }>();
+    for (const r of rows) {
+      let d: { ts?: number; menu?: string[]; choice?: string | null };
+      try {
+        d = JSON.parse(r.json) as { ts?: number; menu?: string[]; choice?: string | null };
+      } catch {
+        continue;
+      }
+      const ts = typeof d.ts === "number" ? d.ts : 0;
+      for (const label of d.menu ?? []) {
+        if (!re.test(label)) continue;
+        const row = by.get(label) ?? { label, offered: 0, picked: 0, lastSeen: 0 };
+        row.offered++;
+        if (d.choice === label) row.picked++;
+        if (ts > row.lastSeen) row.lastSeen = ts;
+        by.set(label, row);
+      }
+    }
+    return [...by.values()].sort((a, b) => b.lastSeen - a.lastSeen);
+  }
+
   /** Ghost path only: records a paper decision that was never executed. Never touches orders/fills. */
   insertGhostDecision(g: GhostDecisionRow): number {
     const r = this.raw

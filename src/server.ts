@@ -116,6 +116,8 @@ export function startServer(deps: ServerDeps, port: number, bind: string): Serve
         const n = Math.max(1, Math.min(50, Number(url.searchParams.get("n") ?? 20) || 20));
         return json(res, 200, e.db.scoutHistory(n));
       }
+      case "/setups":
+        return json(res, 200, e.db.triggerScoreboard());
       case "/events": {
         const addr = clientAddr(req.headers["x-forwarded-for"], req.socket.remoteAddress);
         const mine = streams.get(addr) ?? 0;
