@@ -2059,6 +2059,33 @@ textarea.setup-input {
 .trigger-badge {
   border-style: dashed;
 }
+/* Board position filter (All / Flat / Open): full-width toolbar above the grid. */
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.1rem 0.2rem 0.55rem;
+  font-size: 0.72rem;
+}
+.seg {
+  font: inherit;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 0.15rem 0.6rem;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: none;
+  color: var(--text-2);
+  cursor: pointer;
+}
+.seg[aria-pressed="true"] {
+  border-color: var(--text-2);
+  color: var(--text);
+}
+.toolbar-count {
+  margin-left: auto;
+}
 .trades-btn {
   display: block;
   width: 100%;

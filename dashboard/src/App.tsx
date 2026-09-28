@@ -23,6 +23,7 @@ function readSoundPref(): boolean {
 
 export function App() {
   const [soundOn, setSoundOn] = useState(false);
+  const [posFilter, setPosFilter] = useState<"all" | "flat" | "open">("all");
   const feed = useFeed(soundOn);
   const [, force] = useState(0);
   const [boardCollapsed, boardCollapseBtn] = useCollapsed("board");
@@ -53,6 +54,10 @@ export function App() {
   };
 
   const board = [...BEE_NAMES].sort((a, b) => (feed.bees[b]?.equityUsd ?? 0) - (feed.bees[a]?.equityUsd ?? 0));
+  // Position filter (All / Flat / Open): display only. Ranks and gaps still
+  // measure against the full pack, so filtering never flatters anyone. Fewer
+  // columns also means roomier cards on a crowded six-wolf board.
+  const shown = BEE_NAMES.filter((name) => posFilter === "all" || (posFilter === "flat" ? !feed.bees[name]?.position : !!feed.bees[name]?.position));
   const leaderEq = feed.bees[board[0]!]?.equityUsd ?? 0;
   const baseline = feed.snap?.startEquityUsd ?? 333;
   const stalled = feed.lastEventAt > 0 && Date.now() - feed.lastEventAt > 15_000;
@@ -61,8 +66,19 @@ export function App() {
   return (
     <div className="app">
       <Header snap={feed.snap} connected={feed.connected} stalled={stalled} soundOn={soundOn} onSound={toggleSound} />
-      <main className="grid">
-        {BEE_NAMES.map((name) => {
+      <div className="toolbar" role="group" aria-label="Filter wolves by position">
+        <span className="dim">showing</span>
+        {(["all", "flat", "open"] as const).map((f) => (
+          <button key={f} type="button" className="seg" aria-pressed={posFilter === f} onClick={() => setPosFilter(f)}>
+            {f === "all" ? "All" : f === "flat" ? "Flat" : "Open"}
+          </button>
+        ))}
+        <span className="dim toolbar-count num">
+          {shown.length} of {BEE_NAMES.length}
+        </span>
+      </div>
+      <main className="grid" style={{ gridTemplateColumns: `repeat(${Math.max(1, shown.length)}, 1fr) 1.08fr` }}>
+        {shown.map((name) => {
           const bee = feed.bees[name];
           return (
             <BeeColumn
