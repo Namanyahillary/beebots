@@ -800,6 +800,12 @@ body,
   gap: 0.55rem;
   padding: 0.25rem 0;
 }
+/* Leaderboard shows top 3 + half of 4th in a fade, scrolls for the rest. */
+.board-list {
+  max-height: 8.8rem;
+  overflow-y: auto;
+  mask-image: linear-gradient(to bottom, #000 80%, transparent);
+}
 .board-rank {
   font-weight: 800;
   color: var(--muted);

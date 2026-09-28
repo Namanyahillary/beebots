@@ -118,7 +118,7 @@ export function App() {
               {boardCollapseBtn}
             </div>
             {!boardCollapsed && (
-            <>
+            <div className="board-list">
             {board.map((name, i) => {
               const b = feed.bees[name];
               const width = b ? Math.max(4, (b.equityUsd / Math.max(leaderEq, 1)) * 100) : 0;
@@ -134,7 +134,7 @@ export function App() {
                 </div>
               );
             })}
-            </>
+            </div>
             )}
           </section>
           <Ticker decisions={feed.decisions} perMin={feed.decisionTimes.length} />
