@@ -240,3 +240,18 @@ Two instruments, both descriptive until samples mature:
 Early finding: Blaze's entries are overwhelmingly code-forced (10 max_flat vs 1
 Jev pick) — the null hypothesis (Jev adds nothing over gates-plus-forcing) is
 surviving contact with the data. Verdict needs closed trades in every bucket.
+
+## Fee-multiple rule (doctrine, from the scalp postmortem 2026-09-29)
+
+Entry targets must clear ≥3x the round-trip toll. A 5bp-each-way venue charges
+~0.1R per round trip on any sensibly-sized position (bp-denominated tolls scale
+with size, so no sizing escapes them); ladders add a full-fee leg per rung.
+Applied at ENTRY (sizing/targets), never at exits — exit tolls are unavoidable,
+so gating banks on fee multiples only keeps losers exposed longer. All future
+styles spec their targets against this before anything else.
+
+## Scalpy verdict (retired 2026-09-29)
+
+bee4/bee5 benched at zero trades/day (permanent cap, stops still fire — nothing
+orphans). 78 closes: -$10.71 realised, $14.92 fees. Full postmortem in
+strategies/SCALPER.md. Slots stay visible as evidence, not as traders.

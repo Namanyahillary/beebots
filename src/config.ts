@@ -120,7 +120,11 @@ const EnvSchema = z.object({
   ...perStyle("BREEZY", { trades: 3, fee: 1.0, spread: 5, cooldown: 240, stopAtr: 2, maxFlat: 0 }),
   ...perStyle("BIZZY", { trades: 1, fee: 1.0, spread: 5, cooldown: 5, stopAtr: 1.5, maxFlat: 20 }),
   ...perStyle("BOOZY", { trades: 9, fee: 9.0, spread: 15, cooldown: 2, stopAtr: 2, maxFlat: 0 }),
-  ...perStyle("SCALPY", { trades: 80, fee: 20.0, spread: 5, cooldown: 5, stopAtr: 0.75, maxFlat: 0 }),
+  // SCALPY trades/day is 0: the style was retired 2026-09-29 (postmortem in
+  // strategies/SCALPER.md — 0.6R targets cannot survive 1R stops + ~0.13R tolls).
+  // Zero is a permanent bench (0 trades used >= 0 allowed, every day); stops and
+  // exits still fire on anything already held, so nothing orphans.
+  ...perStyle("SCALPY", { trades: 0, fee: 20.0, spread: 5, cooldown: 5, stopAtr: 0.75, maxFlat: 0 }),
   ...perStyle("FADE", { trades: 3, fee: 3.0, spread: 5, cooldown: 120, stopAtr: 2, maxFlat: 0 }),
   ...perStyle("BOUNCE", { trades: 3, fee: 3.0, spread: 10, cooldown: 120, stopAtr: 1.5, maxFlat: 0 }),
   ...perSlot("BEE1"),

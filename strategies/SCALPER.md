@@ -1,6 +1,6 @@
 # SCALPY — fast day-trader (4th style, proposed)
 
-Status: LIVE since 2026-09-28 (bee4 "Dash" + bee5 "Zip"). Decision gate at 30 resolved scalps — see docs/PROFIT_MODE.md.
+Status: RETIRED 2026-09-29 (verdict below). bee4/bee5 benched at zero trades/day; books frozen as evidence.
 Built as specced with two deltas: (1) entries run through a new generic `ruleDriven`
 engine path (single setup taken as-is, zero Jev calls, all code gates still fire);
 (2) a 30bp chase guard on the micro-high (post-SOL consensus: market-take within,
@@ -83,3 +83,27 @@ spec refuses to pretend otherwise.
 - Multiple concurrent positions (architecture surgery before evidence — refused; revisit only if
   single-position expectancy is positive AND one slot demonstrably bottlenecks it).
 - Sub-$5 targets, short scalps, JEV-in-the-loop entries, forcing entries while flat.
+
+## Verdict (postmortem, 2026-09-29 — killed before the 30-gate, and rightly)
+
+78 close fills: Dash +$7.30 realised / $8.34 fees (45 fills), Zip -$18.01 / $6.58
+(33 fills). Combined -$10.71 realised, $14.92 tolls, on $666 of book. Dash banked
+$7.30 for $8.34 paid; Zip deeply negative. The gate existed for close calls —
+this wasn't one.
+
+Cause (structural, not variance): 0.6R targets ($3) against 1R stops ($5) need
+~65% win rates before tolls; each round trip costs ~0.13R and each ladder rung
+adds another full-fee leg (a +$0.05 trim paid $0.16 — verified in-ledger). No
+size, floor, cooldown, or target tweak changes bp-denominated tolls; widening
+targets lowers hit rates faster than it raises payouts. Fee-multiple gates on
+exits were considered and declined: exit tolls are unavoidable, so skipping
+cheap banks loses more (a full-size BE exit pays double the skipped trim's fee)
+while keeping losers exposed.
+
+Lessons carried forward (doctrine, not tweaks):
+1. Entry targets must clear ≥3x the round-trip toll — written into PROFIT_MODE
+   as the fee-multiple rule for all future styles (the duel already lives it).
+2. Ladders multiply tolls: every rung is a full-fee leg. Future ladders budget
+   legs like risk.
+3. Rank-splitting works (no mirrors after rotation) but cannot fix negative expectancy.
+4. Resetting books never remedies R-math; the gate judges scale-free R so paint colors don't matter.
