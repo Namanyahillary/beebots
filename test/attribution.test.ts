@@ -53,7 +53,7 @@ describe("closeAttribution (closed R by entry source)", () => {
 
 describe("engine stamps entryDecisionId on opens and close fills", () => {
   it("a close fill points back at the open decision", async () => {
-    const cfg = testConfig();
+    const cfg = testConfig({ SCALPY_MAX_TRADES_PER_DAY: "80" });
     const db = new Db(":memory:");
     const bus = new EventBus(db);
     const btc = coin("BTC", { micro: { hiN: 99.8, loN: 98, volRatio: 1.5 } }, 100);

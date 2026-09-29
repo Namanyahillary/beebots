@@ -209,7 +209,8 @@ describe("ruleDriven decide: the code takes the setup, Jev is never called", () 
     const { Engine } = await import("../src/engine.js");
     const { Jev } = await import("../src/jev.js");
     const { Alerts } = await import("../src/alerts.js");
-    const cfg = testConfig();
+    // The live style is retired (cap 0); the harness lifts it to test the frozen mechanics.
+    const cfg = testConfig({ SCALPY_MAX_TRADES_PER_DAY: "80" });
     const db = new Db(":memory:");
     const bus = new EventBus(db);
     const btc = coin("BTC", { micro: { hiN: 99.8, loN: 98, volRatio: 1.5 } }, px);
