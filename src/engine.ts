@@ -1,6 +1,6 @@
 import { customBrain } from "./bees/custom.js";
 import { BRAINS } from "./bees/index.js";
-import { breakevenStopPx as breakevenStopPxCommon, maxNotionalUsd, minutesSince, positionNotional } from "./bees/common.js";
+import { breakevenStopPx as breakevenStopPxCommon, maxNotionalUsd, minutesSince, positionNotional, uplUsd } from "./bees/common.js";
 import { coinOf, type Action, type BeeBrain, type BeeContext, type BeeState, type IdleDetail, type Intent, type Menu, type Position, type Side } from "./bees/types.js";
 import { BEES, STYLES, type BeeId, type Config } from "./config.js";
 import type { Alerts } from "./alerts.js";
@@ -17,7 +17,7 @@ import type { MarketFeed } from "./market/data.js";
 import type { MarketView } from "./market/types.js";
 import { createHash } from "node:crypto";
 import { safeError } from "./redact.js";
-import { applyRisk, takeProfitSignal, type JevStatus, type Proposal } from "./risk.js";
+import { applyRisk, takeProfitSignal, trimCoversFee, type JevStatus, type Proposal } from "./risk.js";
 import { eligibleSetEqual, enrichEligible, sampleExcluded, screenUniverse, type ScoutEligibleEntry } from "./scout.js";
 import { buildSnapshot } from "./snapshot.js";
 
@@ -787,10 +787,22 @@ private filterVenueMenu(menu: Menu, coins: string[]): Menu {
         const inst = ctx.view.instruments.get(bee.position.instId);
         const lots = inst ? roundToLot(bee.position.contracts * sig.trim.fraction, inst) : 0;
         if (inst && lots >= inst.minSz) {
-          tpTrim = { fraction: sig.trim.fraction, uplR: ctx.uplR, ladder: sig.trim.ladder === true };
-          action = { kind: "trim", fraction: sig.trim.fraction };
-          forcedBy = "take_profit";
-          status = `take-profit trim ${Math.round(sig.trim.fraction * 100)}% at +${ctx.uplR.toFixed(1)}R`;
+          // A banking leg must cover its own toll (owner call 2026-09-29: never
+          // pay $0.16 to bank $0.05). Skipped rungs are NOT marked spent — the
+          // signal re-fires if the runner climbs. BE below still fires.
+          const s = ctx.view.stats.get(bee.position.instId);
+          const trimNotional = s && inst ? sig.trim.fraction * positionNotional(bee.position, s.mid, inst.ctVal) : 0;
+          const feeEst = trimNotional * this.d.cfg.risk.takerFeeRate;
+          const upl = s && inst ? uplUsd(bee.position, s.mid, inst.ctVal) : 0;
+          if (!trimCoversFee(upl, sig.trim.fraction, feeEst)) {
+            log.info("take-profit rung skipped: bank below its fee", { bee: id, bank: Number((upl * sig.trim.fraction).toFixed(2)), fee: Number(feeEst.toFixed(2)) });
+            status = `${status}; trim skipped (banks less than its fee)`;
+          } else {
+            tpTrim = { fraction: sig.trim.fraction, uplR: ctx.uplR, ladder: sig.trim.ladder === true };
+            action = { kind: "trim", fraction: sig.trim.fraction };
+            forcedBy = "take_profit";
+            status = `take-profit trim ${Math.round(sig.trim.fraction * 100)}% at +${ctx.uplR.toFixed(1)}R`;
+          }
         } else if (sig.trim.ladder === true) {
           bee.position.lastLadderR = ctx.uplR;
           log.info("ladder rung below minimum size, marked spent", { bee: id });

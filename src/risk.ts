@@ -255,6 +255,22 @@ export function applyRisk(input: RiskInput): RiskResult {
 }
 
 /**
+ * A profit-taking leg must at least pay for its own toll: bank (fraction of
+ * unrealised $) >= estimated taker fee on the trim notional. Skipped rungs are
+ * NOT marked spent — the signal re-fires every tick, so a runner that keeps
+ * climbing still banks. The alternative (hold to the BE stop) pays the same
+ * exit fee on the same half-size with zero banked, plus keeps the upside —
+ * holding dominates trimming when the bank can't cover the fee. (Correction
+ * 2026-09-29: an earlier analysis wrongly compared against a full-size exit
+ * fee; post-trim size is already halved, so the fees are equal and the bank
+ * is the only difference.)
+ */
+export function trimCoversFee(uplUsd: number, fraction: number, feeUsd: number): boolean {
+  if (!(fraction > 0) || !(feeUsd >= 0)) return false;
+  return uplUsd * fraction >= feeUsd;
+}
+
+/**
  * Pure take-profit / breakeven signal (per-brain opt-in; never wired here — the engine wires it).
  * Caller owns the one-shot writes: set trimmedAtR when the trim fills, move the stop to
  * entry ± feeBufferR in the position's favour and set beMoved when moveStopToBe fires.

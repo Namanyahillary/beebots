@@ -4,7 +4,7 @@ import { bizzy } from "../src/bees/bizzy.js";
 import { boozy } from "../src/bees/boozy.js";
 import { breezy } from "../src/bees/breezy.js";
 import type { BeeBrain, BeeContext, Intent } from "../src/bees/types.js";
-import { applyRisk, evaluateCaps, takeProfitSignal, type JevStatus, type Proposal, type RiskInput } from "../src/risk.js";
+import { applyRisk, evaluateCaps, takeProfitSignal, trimCoversFee, type JevStatus, type Proposal, type RiskInput } from "../src/risk.js";
 import { bee, coin, ctx, NOW, position, testConfig, trend, view } from "./fixtures.js";
 
 const open = (instId: string, side: "long" | "short" = "long", setup: "strict" | "loose" = "strict", sizeFrac = 1): Intent => ({ kind: "open", instId, side, sizeFrac, setup });
@@ -378,8 +378,7 @@ describe("takeProfitSignal (pure, per-brain opt-in)", () => {
   });
 });
 
-describe("takeProfitSignal ladder (recurring banking)", () => {
-  const lad = { trimAtR: 2, trimFrac: 0.5, breakevenAtR: 1, feeBufferR: 0.1, ladder: { everyR: 1, frac: 0.25 } };
+describe("takeProfitSignal ladder (recurring banking)", () => {  const lad = { trimAtR: 2, trimFrac: 0.5, breakevenAtR: 1, feeBufferR: 0.1, ladder: { everyR: 1, frac: 0.25 } };
   const mk = (over = {}) => ({ instId: "x", coin: "X", side: "long" as const, contracts: 100, entryPx: 100, openedAt: 0, stopPx: null, riskUsd: 10, trimmedAtR: 2, beMoved: true, lastLadderR: null, ...over });
   it("no rung before trim+everyR, rung at 3R, no refire without new R", () => {
     expect(takeProfitSignal(mk(), 2.5, lad)?.trim).toBeUndefined();
@@ -390,6 +389,16 @@ describe("takeProfitSignal ladder (recurring banking)", () => {
   it("inert without a base trim (BE-only brains unaffected)", () => {
     const beOnly = { trimAtR: Infinity, trimFrac: 0, breakevenAtR: 1, feeBufferR: 0.1, ladder: { everyR: 1, frac: 0.25 } };
     expect(takeProfitSignal(mk({ trimmedAtR: null, beMoved: true }), 5, beOnly)?.trim).toBeUndefined();
+  });
+});
+
+describe("trimCoversFee (never pay toll to bank dust)", () => {
+  it("fires when the bank covers its own leg fee, skips below it", () => {
+    expect(trimCoversFee(2.0, 0.5, 0.16)).toBe(true); // banks $1.00 for $0.16
+    expect(trimCoversFee(0.05, 1.0, 0.16)).toBe(false); // banks $0.05 for $0.16
+    expect(trimCoversFee(0.16, 1.0, 0.16)).toBe(true); // exact cover fires
+    expect(trimCoversFee(5, 0, 0.16)).toBe(false);
+    expect(trimCoversFee(5, 0.5, -1)).toBe(false);
   });
 });
 

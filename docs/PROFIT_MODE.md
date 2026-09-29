@@ -256,9 +256,21 @@ retire line) are the only guards that apply.
 Entry targets must clear ≥3x the round-trip toll. A 5bp-each-way venue charges
 ~0.1R per round trip on any sensibly-sized position (bp-denominated tolls scale
 with size, so no sizing escapes them); ladders add a full-fee leg per rung.
-Applied at ENTRY (sizing/targets), never at exits — exit tolls are unavoidable,
-so gating banks on fee multiples only keeps losers exposed longer. All future
-styles spec their targets against this before anything else.
+Applied at ENTRY (sizing/targets), never as exit *cancellation* — exit tolls are
+unavoidable, so vetoing banks to save fees only keeps losers exposed longer.
+The one legitimate exit-side form is *deferral*: a rung whose bank can't cover
+its own leg waits (re-fires every tick, BE independent) instead of banking dust.
+All future styles spec their targets against this before anything else.
+
+## No dust banking (live 2026-09-29, owner call)
+
+A take-profit rung fires only if its bank covers its own toll leg
+(`trimCoversFee`: fraction × unrealised $ ≥ taker fee on the trim notional).
+Skipped rungs are NOT marked spent — the signal re-fires if the runner climbs —
+and BE still fires independently. (Correction logged in-code: an earlier
+analysis wrongly compared the skipped trim against a full-size exit fee; post
+first-trim the size is already halved, so holding dominates trimming exactly
+when the bank can't cover the fee: equal downside, free upside.)
 
 ## Scalpy verdict (retired 2026-09-29)
 
