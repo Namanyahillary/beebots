@@ -12,6 +12,7 @@ export function normalizePosition(p: Position): Position {
   p.lastLadderR ??= null;
   p.beMoved ??= false;
   p.peakUplUsd ??= null;
+  p.entryDecisionId ??= null;
   return p;
 }
 
@@ -64,7 +65,8 @@ CREATE TABLE IF NOT EXISTS orders (
 CREATE TABLE IF NOT EXISTS fills (
   id INTEGER PRIMARY KEY, order_id INTEGER NOT NULL, bee TEXT NOT NULL, ts INTEGER NOT NULL,
   inst_id TEXT NOT NULL, side TEXT NOT NULL, contracts REAL NOT NULL, px REAL NOT NULL,
-  notional_usd REAL NOT NULL, fee_usd REAL NOT NULL, realised_usd REAL NOT NULL
+  notional_usd REAL NOT NULL, fee_usd REAL NOT NULL, realised_usd REAL NOT NULL,
+  entry_decision_id INTEGER
 );
 CREATE TABLE IF NOT EXISTS funding (
   id INTEGER PRIMARY KEY, bee TEXT NOT NULL, ts INTEGER NOT NULL, inst_id TEXT,
@@ -138,6 +140,8 @@ export interface FillRow {
   notionalUsd: number;
   feeUsd: number;
   realisedUsd: number;
+  /** decisions.id that opened the position this fill reduces (null on opens / pre-attribution rows). */
+  entryDecisionId?: number | null;
 }
 
 /** A ghost (paper-only, never executed) decision. Fully separate from orders/fills/decisions: no helpers here ever write to those tables. */
@@ -185,6 +189,11 @@ export class Db {
     if (!cols.some((c) => c.name === "model")) {
       this.raw.exec(`ALTER TABLE decisions ADD COLUMN model TEXT`);
     }
+    // Existing fills predate close attribution: backfill the entry link once. Fresh DBs have it via SCHEMA.
+    const fillCols = this.raw.prepare(`PRAGMA table_info(fills)`).all() as Array<{ name: string }>;
+    if (!fillCols.some((c) => c.name === "entry_decision_id")) {
+      this.raw.exec(`ALTER TABLE fills ADD COLUMN entry_decision_id INTEGER`);
+    }
   }
 
   insertDecision(d: DecisionRow): number {
@@ -218,8 +227,35 @@ export class Db {
 
   insertFill(f: FillRow): void {
     this.raw
-      .prepare(`INSERT INTO fills (order_id, bee, ts, inst_id, side, contracts, px, notional_usd, fee_usd, realised_usd) VALUES (?,?,?,?,?,?,?,?,?,?)`)
-      .run(f.orderId, f.bee, f.ts, f.instId, f.side, f.contracts, f.px, f.notionalUsd, f.feeUsd, f.realisedUsd);
+      .prepare(`INSERT INTO fills (order_id, bee, ts, inst_id, side, contracts, px, notional_usd, fee_usd, realised_usd, entry_decision_id) VALUES (?,?,?,?,?,?,?,?,?,?,?)`)
+      .run(f.orderId, f.bee, f.ts, f.instId, f.side, f.contracts, f.px, f.notionalUsd, f.feeUsd, f.realisedUsd, f.entryDecisionId ?? null);
+  }
+
+  /**
+   * Closed R by entry source: every close/trim fill joined to the decision
+   * that opened its position. Source is read off the entry decision row —
+   * forced_by set means code forced it in, jev_cached means a reused answer,
+   * input tokens means a fresh Jev call, otherwise the rule path decided.
+   * Rows from before attribution existed land in 'unknown'. Trims count: a
+   * partial bank is realised P&L from that entry choice all the same.
+   */
+  closeAttribution(): Array<{ bee: string; source: string; fills: number; pnlUsd: number; feesUsd: number }> {
+    const rows = this.raw
+      .prepare(
+        `SELECT f.bee AS bee,
+          CASE WHEN d.forced_by IS NOT NULL THEN 'forced:' || d.forced_by
+               WHEN d.jev_cached = 1 THEN 'jev-cached'
+               WHEN d.input_tokens IS NOT NULL THEN 'jev-fresh'
+               WHEN f.entry_decision_id IS NULL THEN 'unknown'
+               ELSE 'rule' END AS source,
+          COUNT(*) AS fills, COALESCE(SUM(f.realised_usd), 0) AS pnl, COALESCE(SUM(f.fee_usd), 0) AS fees
+         FROM fills f LEFT JOIN decisions d ON d.id = f.entry_decision_id
+         JOIN orders o ON o.id = f.order_id
+         WHERE o.reduce_only = 1
+         GROUP BY f.bee, source ORDER BY f.bee, pnl`,
+      )
+      .all() as Array<{ bee: string; source: string; fills: number; pnl: number; fees: number }>;
+    return rows.map((r) => ({ bee: r.bee, source: r.source, fills: r.fills, pnlUsd: r.pnl, feesUsd: r.fees }));
   }
 
   /**

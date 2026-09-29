@@ -1,6 +1,6 @@
 import { customBrain } from "./bees/custom.js";
 import { BRAINS } from "./bees/index.js";
-import { maxNotionalUsd, minutesSince, positionNotional } from "./bees/common.js";
+import { breakevenStopPx as breakevenStopPxCommon, maxNotionalUsd, minutesSince, positionNotional } from "./bees/common.js";
 import { coinOf, type Action, type BeeBrain, type BeeContext, type BeeState, type IdleDetail, type Intent, type Menu, type Position, type Side } from "./bees/types.js";
 import { BEES, STYLES, type BeeId, type Config } from "./config.js";
 import type { Alerts } from "./alerts.js";
@@ -11,6 +11,7 @@ import { contractsFor, roundToLot } from "./exec/sizing.js";
 import type { Jev, JevResult } from "./jev.js";
 import { applyFill, applyFunding, freshBee, mark, rollDay, sizedRiskUsd } from "./ledger.js";
 import { planStaged, settleStaged, stageTick, type StagedPlan } from "./ghostStage.js";
+import { shadowTick } from "./shadow.js";
 import { log } from "./log.js";
 import type { MarketFeed } from "./market/data.js";
 import type { MarketView } from "./market/types.js";
@@ -226,10 +227,7 @@ export function aggregateExposure(bees: BeeState[], view: MarketView): Array<{ i
 
 /** Breakeven stop: entry ± feeBufferR (in R) in the position's favour. Null when 1R has no price meaning. */
 export function breakevenStopPx(p: Position, ctVal: number, feeBufferR: number): number | null {
-  if (!Number.isFinite(p.entryPx) || p.riskUsd <= 0 || p.contracts <= 0 || !(ctVal > 0) || !Number.isFinite(feeBufferR)) return null;
-  const rPx = p.riskUsd / (p.contracts * ctVal);
-  if (!(rPx > 0) || !Number.isFinite(rPx)) return null;
-  return p.side === "long" ? p.entryPx + feeBufferR * rPx : p.entryPx - feeBufferR * rPx;
+  return breakevenStopPxCommon(p, ctVal, feeBufferR);
 }
 
 export interface EngineDeps {
@@ -810,6 +808,13 @@ private filterVenueMenu(menu: Menu, coins: string[]): Menu {
     }
 
     this.recordGhost(id, ctx, brain, menu, now);
+    // No-Jev shadow arm (causal experiment): simulated every tick, caged in
+    // ghost_decisions, failures contained — it can never break a trading tick.
+    try {
+      shadowTick(id, brain, ctx, menu, now, this.d.db);
+    } catch (err) {
+      log.warn("shadow tick failed", { bee: id, err: safeError(err) });
+    }
 
     // Hard rule 10: recorded before it is acted on.
     const costUsd = r && r.ok ? r.costUsd : 0;
@@ -1102,6 +1107,8 @@ private filterVenueMenu(menu: Menu, coins: string[]): Menu {
     const ok = await this.order(id, decisionId, instId, side === "long" ? "buy" : "sell", contracts, false, "open");
     const bee = this.bees[id];
     if (!ok || !bee.position) return;
+    // Close attribution: every later fill on this position points back here.
+    bee.position.entryDecisionId = decisionId;
     // Staged-entry ghost: shadow Grim's one-shot with the staged counterfactual (measurement only).
     if (this.brain(id).id === "bizzy" && side === "long") {
       const pos = bee.position;
@@ -1152,9 +1159,11 @@ private filterVenueMenu(menu: Menu, coins: string[]): Menu {
     }
     db.updateOrder(orderId, "filled", res.ordId, null);
     const bee = this.bees[id];
+    // Capture before applyFill: a full close clears the position (and its entry link) below.
+    const entryDecisionId = reduceOnly ? (bee.position?.entryDecisionId ?? null) : null;
     const realised = applyFill(bee, { instId, coin: inst.coin, side, contracts: res.contracts, px: res.avgPx, feeUsd: res.feeUsd, ctVal: inst.ctVal, ts: res.ts });
     const notionalUsd = res.contracts * inst.ctVal * res.avgPx;
-    db.insertFill({ orderId, bee: id, ts: res.ts, instId, side, contracts: res.contracts, px: res.avgPx, notionalUsd, feeUsd: res.feeUsd, realisedUsd: realised });
+    db.insertFill({ orderId, bee: id, ts: res.ts, instId, side, contracts: res.contracts, px: res.avgPx, notionalUsd, feeUsd: res.feeUsd, realisedUsd: realised, entryDecisionId });
     mark(bee, res.avgPx, inst.ctVal);
     // Staged-entry ghost: settle the staged shadow at the REAL exit (bizzy only, measurement).
     // Full closes only: a partial trim leaves the live position (and the shadow) running.

@@ -25,6 +25,7 @@
     "test": "vitest run",
     "universe": "tsx src/tools/universe.ts",
     "ghost-delta": "tsx src/tools/ghost-delta.ts",
+    "jev:value": "tsx src/tools/jev-value.ts",
     "snapshot": "tsx src/tools/snapshot.ts",
     "parity": "tsx src/tools/parity-market.ts",
     "e2e:fake-jev": "tsx test/e2e-dry.harness.ts",

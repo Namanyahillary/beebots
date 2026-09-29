@@ -34,6 +34,14 @@ export function atrStop(s: CoinStats | undefined, side: Side, entryPx: number, m
   return side === "long" ? entryPx - dist : entryPx + dist;
 }
 
+/** Breakeven stop: entry ± feeBufferR (in R) in the position's favour. Null when 1R has no price meaning. */
+export function breakevenStopPx(p: Position, ctVal: number, feeBufferR: number): number | null {
+  if (!Number.isFinite(p.entryPx) || p.riskUsd <= 0 || p.contracts <= 0 || !(ctVal > 0) || !Number.isFinite(feeBufferR)) return null;
+  const rPx = p.riskUsd / (p.contracts * ctVal);
+  if (!(rPx > 0) || !Number.isFinite(rPx)) return null;
+  return p.side === "long" ? p.entryPx + feeBufferR * rPx : p.entryPx - feeBufferR * rPx;
+}
+
 /** Shared per-bee state line for every snapshot. */
 export function beeLine(ctx: BeeContext): Record<string, number | string | null> {
   const { bee, knobs, now } = ctx;

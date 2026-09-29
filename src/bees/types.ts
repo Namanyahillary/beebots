@@ -28,6 +28,8 @@ export interface Position {
   beMoved?: boolean;
   /** Highest unrealised USD seen on this position (null = not yet measured; persisted, survives reconcile). */
   peakUplUsd?: number | null;
+  /** Decision row that opened this position (null = opened before attribution existed, or restored from the venue). Lets close fills point back to the entry choice. */
+  entryDecisionId?: number | null;
 }
 
 /** Per-brain opt-in take-profit / breakeven policy (R-multiples; never universal). */

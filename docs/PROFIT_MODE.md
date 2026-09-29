@@ -221,3 +221,22 @@ with modern gates: strict RSI-outside-band doubles only, funding veto on longs,
 3/day $3 budget, rule-driven. Distinct from Rook (price extremes vs positioning
 extremes); same-side fills attribute per bee for comparison. Decision gate at 20
 resolved reverts: expectancy > 0 net of fees keeps it, else kill with postmortem.
+
+## Is Jev doing good or bad (shipped 2026-09-29 — measurement, not verdict)
+
+Two instruments, both descriptive until samples mature:
+1. **Close attribution** — positions stamp their entry decision id at open;
+   close/trim fills carry it. `Db.closeAttribution()` (and `pnpm jev:value`)
+   groups closed $ by entry source: `forced:*` (code pushed it in), `jev-fresh`
+   (live model call), `jev-cached` (reused answer), `rule` (code path, incl.
+   rule-driven takes), `unknown` (pre-attribution fills). Trims count — a
+   partial bank is realised P&L from that entry choice.
+2. **No-Jev shadow arm** (`src/shadow.ts`) — for every Jev-consulted brain, a
+   deterministic shadow book trades the same menu with the same exits but
+   first-strict-setup entries (no conviction filter, no WAIT). Gross R both
+   sides; SHADOW_OPEN/SHADOW_FILL rows in ghost_decisions only. Forced entries
+   mirrored (they're code, not Jev — excluding them would flatter the shadow).
+   Known biases disclosed in-file (no profit-lock, no outage sit-outs).
+Early finding: Blaze's entries are overwhelmingly code-forced (10 max_flat vs 1
+Jev pick) — the null hypothesis (Jev adds nothing over gates-plus-forcing) is
+surviving contact with the data. Verdict needs closed trades in every bucket.
