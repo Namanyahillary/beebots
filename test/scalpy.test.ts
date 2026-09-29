@@ -237,7 +237,7 @@ describe("ruleDriven decide: the code takes the setup, Jev is never called", () 
     engine.bees[slot] = { ...bee("scalpy"), id: slot };
     type E = { decide(id: string, now: number): Promise<void>; jevMade: Record<string, number>; last: Record<string, { status: string; choice: string | null }> };
     const e = engine as unknown as E;
-    return { decide: (t: number) => e.decide(slot, t), made: () => e.jevMade[slot] ?? 0, status: () => e.last[slot]?.status ?? "", choice: () => e.last[slot]?.choice ?? null, engine };
+    return { decide: (t: number) => e.decide(slot, t), made: () => e.jevMade[slot] ?? 0, status: () => e.last[slot]?.status ?? "", choice: () => e.last[slot]?.choice ?? null, engine, jev };
   }
   it("opens SCALP_BTC with zero Jev calls", async () => {
     // Odd UTC hour → bee4 holds first pick on the single setup.
@@ -262,5 +262,14 @@ describe("ruleDriven decide: the code takes the setup, Jev is never called", () 
     expect(made()).toBe(0);
     expect(engine.bees["bee5"]!.position?.coin).toBe("BTC");
     expect(status()).toContain("SCALP_BTC");
+  });
+  it("a tripped Jev spend cap does not veto rule-driven bees (they spend $0)", async () => {
+    const odd = NOW + 3_600_000;
+    const h = await scalpyHarness(100, "bee4", odd);
+    Object.defineProperty(h.jev, "capTripped", { value: true, configurable: true });
+    await h.decide(odd);
+    expect(h.made()).toBe(0);
+    expect(h.engine.bees["bee4"]!.position?.coin).toBe("BTC");
+    expect(h.status()).not.toMatch(/daily cap/);
   });
 });

@@ -692,7 +692,10 @@ private filterVenueMenu(menu: Menu, coins: string[]): Menu {
     // "no_options" (the watching pulse still fires), a triggered setup is
     // "rule" (the code takes it below). Either way no API call is made.
     const ruleDriven = brain.ruleDriven === true;
-    if (jev.capTripped) jevStatus = "daily_cap";
+    // The spend cap guards API dollars. Rule-driven bees make no API call at all,
+    // so a tripped cap must not veto them (it used to, freezing Rook/Echo on Grim's
+    // spend). Locked-hold bees stay under the cap: they still read cached answers.
+    if (jev.capTripped && !ruleDriven) jevStatus = "daily_cap";
     else if (Object.keys(menu).length === 0) jevStatus = "no_options";
     else if (ruleDriven) {
       jevStatus = "rule";

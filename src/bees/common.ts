@@ -22,9 +22,10 @@ export function minutesSince(ts: number | null, now: number): number {
  */
 export const MARGIN_HEADROOM = 0.97;
 
-/** Max notional before the live ramp: min(MAX_LEVERAGE x equity x MARGIN_HEADROOM, MAX_NOTIONAL_USD_PER_BEE). */
+/** Max notional before the live ramp: min(leverage x equity x MARGIN_HEADROOM, MAX_NOTIONAL_USD_PER_BEE). Paper is spot with no margin, so leverage is 1 there regardless of MAX_LEVERAGE. */
 export function maxNotionalUsd(ctx: BeeContext): number {
-  return Math.max(0, Math.min(ctx.cfg.risk.maxLeverage * ctx.bee.equityUsd * MARGIN_HEADROOM, ctx.cfg.risk.maxNotionalUsdPerBee));
+  const lev = ctx.cfg.mode === "paper" ? 1 : ctx.cfg.risk.maxLeverage;
+  return Math.max(0, Math.min(lev * ctx.bee.equityUsd * MARGIN_HEADROOM, ctx.cfg.risk.maxNotionalUsdPerBee));
 }
 
 /** ATR-multiple stop from the 15m ATR%. */
