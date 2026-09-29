@@ -1,6 +1,6 @@
 # SCALPY — fast day-trader (4th style, proposed)
 
-Status: RETIRED 2026-09-29 (verdict below). bee4/bee5 benched at zero trades/day; books frozen as evidence.
+Status: CALIBRATION v2 since 2026-09-29 (retired 9/28, un-benched 9/29 — paper costs nothing and entry selectivity was never tested). Dash = frozen control (retired ladder config). Zip = fresh-only variant (skips exhausted thrusts, yields on deterministic collision with Dash's pick). Next 30 combined decide again; expectancy ≤ 0 kills both with no third act.
 Built as specced with two deltas: (1) entries run through a new generic `ruleDriven`
 engine path (single setup taken as-is, zero Jev calls, all code gates still fire);
 (2) a 30bp chase guard on the micro-high (post-SOL consensus: market-take within,

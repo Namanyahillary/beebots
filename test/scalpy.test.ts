@@ -114,10 +114,21 @@ describe("scalpy menu (one setup, or nothing)", () => {
     expect(Object.keys(scalpy.menu(ctx("scalpy", bee("scalpy"), v, testConfig(), odd)))).toEqual(["SCALP_HYPE"]);
     expect(pickScalp(ctx("scalpy", bee("scalpy"), v))?.coin).toBe("HYPE");
   });
-  it("one setup only: whoever holds first pick takes it, the other waits", () => {
-    const v = view([coin("BTC", { micro: { hiN: 99.8, loN: 98, volRatio: 1.5 } }, 100)]);
-    expect(Object.keys(scalpy.menu(ctx("scalpy", bee("bee5"), v)))).toEqual(["SCALP_BTC"]);
-    expect(Object.keys(scalpy.menu(ctx("scalpy", bee("scalpy"), v)))).toEqual([]);
+  it("Zip fresh-only variant: skips exhausted thrusts, yields on deterministic collision", () => {
+    // Gaps: HYPE +5bp (exhausted), ETH +10bp (fresh), BTC +20bp (fresh).
+    const v = view([
+      coin("BTC", { micro: { hiN: 99.8, loN: 98, volRatio: 1.5 } }, 100),
+      coin("ETH", { micro: { hiN: 99.9, loN: 98, volRatio: 1.5 } }, 100),
+      coin("HYPE", { micro: { hiN: 99.95, loN: 98, volRatio: 9, formingHigh: 100.5 } }, 100),
+    ]);
+    // NOW is an even hour (Zip first): Zip's fresh pool is [ETH, BTC], rank 0 = ETH;
+    // Dash's full rank 1 = ETH too → collision → Zip yields, Dash takes ETH.
+    expect(Object.keys(scalpy.menu(ctx("scalpy", bee("scalpy"), v)))).toEqual(["SCALP_ETH"]);
+    expect(Object.keys(scalpy.menu(ctx("scalpy", bee("bee5"), v)))).toEqual([]);
+    // Odd hour (Dash first): Dash rank 0 = HYPE_XHT, Zip fresh pool rank 1 = BTC.
+    const odd = NOW + 3_600_000;
+    expect(Object.keys(scalpy.menu(ctx("scalpy", bee("scalpy"), v, testConfig(), odd)))).toEqual(["SCALP_HYPE_XHT"]);
+    expect(Object.keys(scalpy.menu(ctx("scalpy", bee("bee5"), v, testConfig(), odd)))).toEqual(["SCALP_BTC"]);
   });
   it("flat with no trigger = empty menu (nothing to ask Jev)", () => {
     const m = scalpy.menu(ctx("scalpy", bee("scalpy"), view([coin("BTC", wide, 99)])));

@@ -97,10 +97,25 @@ export const SCALPY_SECOND_SLOT = "bee5";
  * the ranks always differ, so the pair still never mirror. Deterministic, no
  * shared state.
  */
-function pickRank(ctx: BeeContext): 0 | 1 {
-  const zipFirst = Math.floor(ctx.now / 3_600_000) % 2 === 0;
-  const second = ctx.bee.id === SCALPY_SECOND_SLOT;
+/**
+ * Rank index for a slot under the hourly rotation (pure function of slot + time,
+ * so either bee can compute the other's pick deterministically — no shared state).
+ */
+export function pickRankFor(slot: string, now: number): 0 | 1 {
+  const zipFirst = Math.floor(now / 3_600_000) % 2 === 0;
+  const second = slot === SCALPY_SECOND_SLOT;
   return zipFirst === second ? 0 : 1;
+}
+
+function pickRank(ctx: BeeContext): 0 | 1 {
+  return pickRankFor(ctx.bee.id, ctx.now);
+}
+
+/** True when the setup's thrust is fresh (not an exhausted sagging spike). */
+function isFresh(ctx: BeeContext, setup: MicroSetup): boolean {
+  const s = ctx.view.stats.get(setup.instId);
+  if (!s) return true;
+  return !(thrustState(s)?.exhausted ?? false);
 }
 
 /** Nearest micro-high by % still to rise (null = no micro data). Whole gated list. */
@@ -158,16 +173,22 @@ export const scalpy: BeeBrain = {
   },
 
   menu(ctx): Menu {
-    // Flat: Dash and Zip split by rotating rank (hourly first-pick rotation —
-    // neither mirrors, neither is stuck with the leftovers) — or nothing. The
-    // label carries the wick tag (SCALP_<coin> fresh, SCALP_<coin>_XHT exhausted
-    // thrust) so fills attribute clean vs bull-trap entries; the code takes
-    // either one. Positioned: nothing — the stop, the TP ladder and the time
-    // stop all fire in code.
+    // Flat: Dash (frozen control: the retired ladder config) and Zip (fresh-only
+    // variant: skips exhausted thrusts) split by rotating rank — or nothing. Zip
+    // yields when his pick coincides with Dash's deterministically-computed pick,
+    // so the pair still never mirror. The label carries the wick tag so fills
+    // attribute clean vs bull-trap entries; the code takes either one.
+    // Positioned: nothing — the stop, the TP ladder and the time stop fire in code.
     if (ctx.bee.position) return {};
     const ranked = rankScalps(ctx);
-    const pick = ranked[pickRank(ctx)];
+    const second = ctx.bee.id === SCALPY_SECOND_SLOT;
+    const pool = second ? ranked.filter((x) => isFresh(ctx, x)) : ranked;
+    const pick = pool[pickRank(ctx)];
     if (!pick) return {};
+    if (second) {
+      const dashPick = ranked[pickRankFor("bee4", ctx.now)];
+      if (dashPick && dashPick.instId === pick.instId) return {};
+    }
     const s = ctx.view.stats.get(pick.instId);
     const t = s ? thrustState(s) : null;
     const label = t?.exhausted ? `SCALP_${pick.coin}_XHT` : `SCALP_${pick.coin}`;
