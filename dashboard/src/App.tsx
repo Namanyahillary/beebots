@@ -122,7 +122,7 @@ export function App() {
             <div className="rail-head">
               <span className="eyebrow">
                 Leaderboard <Help title="Leaderboard">
-                  <p>Leaderboard ranks the three wolves by current equity.</p>
+                  <p>Leaderboard ranks the pack by current equity.</p>
                   <dl>
                     <dt>Local board</dt>
                     <dd>The widest bar wins on this screen.</dd>

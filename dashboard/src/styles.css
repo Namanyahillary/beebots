@@ -498,6 +498,7 @@ body,
 }
 .rank {
   text-align: right;
+  flex: none;
 }
 .rank-n {
   font-size: 1.9rem;

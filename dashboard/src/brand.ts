@@ -3,10 +3,10 @@
 
 export const BRAND = {
   appName: "Wolfbots",
-  tagline: "three AI wolves hunting live",
-  extendedTagline: "Three AI wolves hunting live on OKX X-Perps",
+  tagline: "AI wolves hunting live",
+  extendedTagline: "AI wolves hunting live on OKX X-Perps",
   description:
-    "Three AI trading wolves, one decision model, paper trading on OKX X-Perps. Every decision, order, fee and funding payment, live. Not financial advice.",
+    "AI trading wolves, one decision model, paper trading on OKX X-Perps. Every decision, order, fee and funding payment, live. Not financial advice.",
 
   mascot: {
     singular: "wolf",
