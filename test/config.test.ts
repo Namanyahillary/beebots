@@ -86,7 +86,7 @@ describe("config", () => {
     expect(c.bees.breezy).toMatchObject({ maxTradesPerDay: 3, feeBudgetUsdDay: 1, maxFlatMinutes: 0, cooldownMinutes: 240 });
     expect(c.bees.scalpy).toMatchObject({ maxTradesPerDay: 80, feeBudgetUsdDay: 20, spreadGateBps: 5, cooldownMinutes: 5, stopAtrMult: 0.75, maxFlatMinutes: 0 });
     expect(c.bees.fade).toMatchObject({ maxTradesPerDay: 3, feeBudgetUsdDay: 3, spreadGateBps: 5, cooldownMinutes: 120, stopAtrMult: 2, maxFlatMinutes: 0 });
-    expect(c.bees.bounce).toMatchObject({ maxTradesPerDay: 3, feeBudgetUsdDay: 3, spreadGateBps: 10, cooldownMinutes: 120, stopAtrMult: 1.5, maxFlatMinutes: 0 });
+    expect(c.bees.bounce).toMatchObject({ maxTradesPerDay: 15, feeBudgetUsdDay: 15, spreadGateBps: 10, cooldownMinutes: 120, stopAtrMult: 1.5, maxFlatMinutes: 0 });
     expect(c.tickMs).toBe(10_000);
     expect(c.jev.dailyUsdCap).toBe(2);
     expect(c.dataRefreshMs).toBe(60_000);

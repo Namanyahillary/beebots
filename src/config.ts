@@ -126,7 +126,7 @@ const EnvSchema = z.object({
   // variant (skips exhausted thrusts). Next 30 combined decide again.
   ...perStyle("SCALPY", { trades: 80, fee: 20.0, spread: 5, cooldown: 5, stopAtr: 0.75, maxFlat: 0 }),
   ...perStyle("FADE", { trades: 3, fee: 3.0, spread: 5, cooldown: 120, stopAtr: 2, maxFlat: 0 }),
-  ...perStyle("BOUNCE", { trades: 3, fee: 3.0, spread: 10, cooldown: 120, stopAtr: 1.5, maxFlat: 0 }),
+  ...perStyle("BOUNCE", { trades: 15, fee: 15.0, spread: 10, cooldown: 120, stopAtr: 1.5, maxFlat: 0 }),
   ...perSlot("BEE1"),
   ...perSlot("BEE2"),
   ...perSlot("BEE3"),

@@ -241,6 +241,16 @@ Early finding: Blaze's entries are overwhelmingly code-forced (10 max_flat vs 1
 Jev pick) — the null hypothesis (Jev adds nothing over gates-plus-forcing) is
 surviving contact with the data. Verdict needs closed trades in every bucket.
 
+## Go-live limits (standing directive, owner 2026-09-29)
+
+Current per-style caps (trades/day, fee budgets) are DATA-GATHERING values,
+opened up to fill sample jars. They are NOT live values. After months of
+analysis and paper trading, each strategy gets its daily limits set deliberately
+from its measured expectancy, fee drag, and market analysis — per style, in
+`perStyle` + `.env` overrides, reviewed like code. Until that review, nobody
+tightens anything in the name of protection: the % gates (8% daily stop, 40%
+retire line) are the only guards that apply.
+
 ## Fee-multiple rule (doctrine, from the scalp postmortem 2026-09-29)
 
 Entry targets must clear ≥3x the round-trip toll. A 5bp-each-way venue charges
