@@ -77,10 +77,14 @@ export function App() {
   // Position filter (All / Flat / Open): display only. Ranks and gaps still
   // measure against the full pack, so filtering never flatters anyone. Fewer
   // columns also means roomier cards on a crowded six-wolf board.
+  // Filter axes, deliberately asymmetric: Flat means flat AND available (a
+  // benched-flat bee will never trade, so it would only pollute the ready view
+  // — the retired twins live under Benched). Open keeps benched riders: a
+  // capped bee nursing a position is still live risk with working stops.
   const shown = BEE_NAMES.filter((name) => {
     const bee = feed.bees[name];
     switch (posFilter) {
-      case "flat": return !bee?.position;
+      case "flat": return !bee?.position && bee?.cap == null;
       case "open": return !!bee?.position;
       case "benched": return bee?.cap != null;
       default: return true;
