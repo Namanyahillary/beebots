@@ -21,12 +21,12 @@ function readSoundPref(): boolean {
   }
 }
 
-type PosFilter = "all" | "flat" | "open";
+type PosFilter = "all" | "flat" | "open" | "benched";
 
 function readPosFilter(): PosFilter {
   try {
     const v = localStorage.getItem("bees.posFilter");
-    return v === "flat" || v === "open" ? v : "all";
+    return v === "flat" || v === "open" || v === "benched" ? v : "all";
   } catch {
     return "all";
   }
@@ -77,7 +77,15 @@ export function App() {
   // Position filter (All / Flat / Open): display only. Ranks and gaps still
   // measure against the full pack, so filtering never flatters anyone. Fewer
   // columns also means roomier cards on a crowded six-wolf board.
-  const shown = BEE_NAMES.filter((name) => posFilter === "all" || (posFilter === "flat" ? !feed.bees[name]?.position : !!feed.bees[name]?.position));
+  const shown = BEE_NAMES.filter((name) => {
+    const bee = feed.bees[name];
+    switch (posFilter) {
+      case "flat": return !bee?.position;
+      case "open": return !!bee?.position;
+      case "benched": return bee?.cap != null;
+      default: return true;
+    }
+  });
   const leaderEq = feed.bees[board[0]!]?.equityUsd ?? 0;
   const baseline = feed.snap?.startEquityUsd ?? 333;
   const stalled = feed.lastEventAt > 0 && Date.now() - feed.lastEventAt > 15_000;
@@ -88,9 +96,9 @@ export function App() {
       <Header snap={feed.snap} connected={feed.connected} stalled={stalled} soundOn={soundOn} onSound={toggleSound} />
       <div className="toolbar" role="group" aria-label="Filter wolves by position">
         <span className="dim">showing</span>
-        {(["all", "flat", "open"] as const).map((f) => (
+        {(["all", "flat", "open", "benched"] as const).map((f) => (
           <button key={f} type="button" className="seg" aria-pressed={posFilter === f} onClick={() => pickPosFilter(f)}>
-            {f === "all" ? "All" : f === "flat" ? "Flat" : "Open"}
+            {f === "all" ? "All" : f === "flat" ? "Flat" : f === "open" ? "Open" : "Benched"}
           </button>
         ))}
         <span className="dim toolbar-count num">
