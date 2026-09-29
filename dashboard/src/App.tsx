@@ -97,7 +97,8 @@ export function App() {
           {shown.length} of {BEE_NAMES.length}
         </span>
       </div>
-      <main className="grid" style={{ gridTemplateColumns: `repeat(${Math.max(1, shown.length)}, 1fr) 1.08fr` }}>
+      <main className="grid">
+        <div className="board-scroll">
         {shown.map((name) => {
           const bee = feed.bees[name];
           return (
@@ -115,6 +116,7 @@ export function App() {
             />
           );
         })}
+        </div>
         <aside className="rail">
           <section className={`rail-card board${boardCollapsed ? " collapsed" : ""}`}>
             <div className="rail-head">
