@@ -27,6 +27,8 @@
   --zippy-glow: rgba(34, 211, 238, 0.45);
   --fade: #ec4899;
   --fade-glow: rgba(236, 72, 153, 0.45);
+  --bounce: #a3e635;
+  --bounce-glow: rgba(163, 230, 53, 0.45);
 
   /* Status (conventional market semantics: green gains, red losses — always paired with a ▲/▼ glyph) */
   --good: #16a34a;
@@ -405,7 +407,7 @@ body,
   flex: 1;
   min-height: 0;
   display: grid;
-  grid-template-columns: repeat(6, 1fr) 1.08fr;
+  grid-template-columns: repeat(7, 1fr) 1.08fr;
   gap: 1rem;
 }
 

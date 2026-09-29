@@ -5,8 +5,8 @@ import { chmodSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSy
 import { dirname } from "node:path";
 import { z } from "zod";
 
-export const STYLES = ["bizzy", "breezy", "boozy", "scalpy", "fade"] as const;
-/** A trading style is one of the five built-in strategies, named after the bee that first traded it. */
+export const STYLES = ["bizzy", "breezy", "boozy", "scalpy", "fade", "bounce"] as const;
+/** A trading style is one of the six built-in strategies, named after the bee that first traded it. */
 export type StyleId = (typeof STYLES)[number];
 
 export const STYLE_INFO: Record<StyleId, { label: string; blurb: string; name: string; tagline: string }> = {
@@ -40,6 +40,12 @@ export const STYLE_INFO: Record<StyleId, { label: string; blurb: string; name: s
     name: "Rook",
     tagline: "the contrarian",
   },
+  bounce: {
+    label: "Revert",
+    blurb: "Mean reversion: buys stretched selloffs (RSI under 30, outside the band) and shorts stretched rallies. The building's first strategy, revived with modern gates.",
+    name: "Echo",
+    tagline: "the snap-back",
+  },
 };
 
 /**
@@ -47,7 +53,7 @@ export const STYLE_INFO: Record<StyleId, { label: string; blurb: string; name: s
  * name (two wolves, one playbook). bee5 runs scalpy beside bee4, so two
  * scalps can work concurrently while every bee keeps its single position.
  */
-export const SLOT_IDENTITY: Partial<Record<"bee1" | "bee2" | "bee3" | "bee4" | "bee5" | "bee6", { name: string; tagline: string }>> = {
+export const SLOT_IDENTITY: Partial<Record<string, { name: string; tagline: string }>> = {
   bee5: { name: "Zip", tagline: "the restless one" },
   bee6: { name: "Rook", tagline: "the contrarian" },
 };
@@ -60,7 +66,7 @@ const squash = (s: string) =>
     .replace(/bee$/, "")
     .replace(/(.)\1+/g, "$1")
     .replace(/(ie|ey|i)$/, "y");
-const RESERVED = new Set([...STYLES.map((s) => squash(STYLE_INFO[s].name)), ...Object.values(SLOT_IDENTITY).map((w) => squash(w.name))]);
+const RESERVED = new Set([...STYLES.map((s) => squash(STYLE_INFO[s].name)), ...Object.values(SLOT_IDENTITY).map((w) => squash(w!.name))]);
 
 export function isReservedName(name: string): boolean {
   return RESERVED.has(squash(name));

@@ -1,9 +1,9 @@
 // Mirrors the engine's read-only /snapshot and SSE payloads. No account data exists in these shapes.
 import { BEE_MARK_URL } from "./BeeMark";
 
-/** The six bee slots. Names, taglines and portraits come from the engine's /profile (bee1-3 set on the Setup page; bee4/bee5/bee6 are built-in). */
-export type BeeName = "bee1" | "bee2" | "bee3" | "bee4" | "bee5" | "bee6";
-export const BEE_NAMES: BeeName[] = ["bee1", "bee2", "bee3", "bee4", "bee5", "bee6"];
+/** The seven bee slots. Names, taglines and portraits come from the engine's /profile (bee1-3 set on the Setup page; bee4-bee7 are built-in). */
+export type BeeName = "bee1" | "bee2" | "bee3" | "bee4" | "bee5" | "bee6" | "bee7";
+export const BEE_NAMES: BeeName[] = ["bee1", "bee2", "bee3", "bee4", "bee5", "bee6", "bee7"];
 
 export type Cap = "trade_cap" | "fee_budget" | "loss_stop" | "retired" | null;
 
@@ -192,6 +192,8 @@ export const BEE_META: Record<BeeName, BeeMeta> = {
   bee5: { short: "Zip", tagline: "the restless one", styleLabel: "Scalp", rules: "", coins: [], img: BEE_MARK_URL, color: "var(--zippy)", glow: "var(--zippy-glow)" },
   /** Rook fades crowded positioning — placeholder until painted. */
   bee6: { short: "Rook", tagline: "the contrarian", styleLabel: "Fade", rules: "", coins: [], img: BEE_MARK_URL, color: "var(--fade)", glow: "var(--fade-glow)" },
+  /** Echo reverts price stretches — placeholder until painted. */
+  bee7: { short: "Echo", tagline: "the snap-back", styleLabel: "Revert", rules: "", coins: [], img: BEE_MARK_URL, color: "var(--bounce)", glow: "var(--bounce-glow)" },
 };
 
 export interface Profile {

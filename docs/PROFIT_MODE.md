@@ -209,3 +209,15 @@ coin — nothing here may depend on it). Paper gets the long leg only (venue_sho
 handles the rest). Decision gate at 20 resolved fades (rare by construction —
 this one takes weeks): expectancy > 0 net of fees keeps it, else kill with
 postmortem.
+
+## Echo, 7th bee (shipped 2026-09-29 — gate open, judgement at 20 reverts)
+
+bee7 "Echo" runs `bounce`, the mean-reverter from `strategies/BOUNCE.md` (now
+LIVE) — the pack's last untested axis: every wolf hunts direction except Rook,
+who fades positioning. Echo fades price itself. It revives the building's first
+strategy (the Z1 BbandRsi fade, retired into Grim's file as reference helpers)
+with modern gates: strict RSI-outside-band doubles only, funding veto on longs,
+1% risk on 1.5× ATR stops, trim half +1R / out +2R, BE +0.75R, 8h time stop,
+3/day $3 budget, rule-driven. Distinct from Rook (price extremes vs positioning
+extremes); same-side fills attribute per bee for comparison. Decision gate at 20
+resolved reverts: expectancy > 0 net of fees keeps it, else kill with postmortem.

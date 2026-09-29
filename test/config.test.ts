@@ -29,7 +29,7 @@ describe("config", () => {
 
   it("demo with every key set loads per-bee creds", () => {
     const env: Record<string, string> = { TYPESAFE_API_KEY: "k", DRY_RUN: "false", MODE: "demo" };
-    for (const b of ["BEE1", "BEE2", "BEE3", "BEE4", "BEE5", "BEE6"]) for (const f of ["KEY", "SECRET", "PASSPHRASE"]) env[`${b}_OKX_DEMO_API_${f}`] = `${b}-${f}`;
+    for (const b of ["BEE1", "BEE2", "BEE3", "BEE4", "BEE5", "BEE6", "BEE7"]) for (const f of ["KEY", "SECRET", "PASSPHRASE"]) env[`${b}_OKX_DEMO_API_${f}`] = `${b}-${f}`;
     const cfg = loadConfig(env);
     expect(cfg.mode).toBe("demo");
     expect(cfg.creds.bee3?.apiKey).toBe("BEE3-KEY");
@@ -37,14 +37,14 @@ describe("config", () => {
 
   it("live needs the written risk acknowledgement, and demo/dry do not", () => {
     const env: Record<string, string> = { TYPESAFE_API_KEY: "k", DRY_RUN: "false", MODE: "live" };
-    for (const b of ["BEE1", "BEE2", "BEE3", "BEE4", "BEE5", "BEE6"]) for (const f of ["KEY", "SECRET", "PASSPHRASE"]) env[`${b}_OKX_API_${f}`] = `${b}-${f}`;
+    for (const b of ["BEE1", "BEE2", "BEE3", "BEE4", "BEE5", "BEE6", "BEE7"]) for (const f of ["KEY", "SECRET", "PASSPHRASE"]) env[`${b}_OKX_API_${f}`] = `${b}-${f}`;
     expect(() => loadConfig(env)).toThrow(/LIVE_ACK/);
     expect(() => loadConfig({ ...env, LIVE_ACK: "yes" })).toThrow(/LIVE_ACK/);
     expect(loadConfig({ ...env, LIVE_ACK: LIVE_ACK_PHRASE }).mode).toBe("live");
     expect(loadConfig({ TYPESAFE_API_KEY: "k" }).mode).toBe("dry");
   });
 
-  it("with no Setup file the bees are the original six", () => {
+  it("with no Setup file the bees are the original seven", () => {
     const c = loadConfig({ TYPESAFE_API_KEY: "k" });
     expect(c.slots.bee1).toMatchObject({ style: "bizzy", name: "Grim", customImage: false });
     expect(c.slots.bee2).toMatchObject({ style: "breezy", name: "Silver" });
@@ -52,6 +52,7 @@ describe("config", () => {
     expect(c.slots.bee4).toMatchObject({ style: "scalpy", name: "Dash", customImage: false, fromSetup: false });
     expect(c.slots.bee5).toMatchObject({ style: "scalpy", name: "Zip", customImage: false, fromSetup: false });
     expect(c.slots.bee6).toMatchObject({ style: "fade", name: "Rook", customImage: false, fromSetup: false });
+    expect(c.slots.bee7).toMatchObject({ style: "bounce", name: "Echo", customImage: false, fromSetup: false });
   });
 
   it("a Setup file supplies the Jev key and the bees; the environment still wins", () => {
@@ -74,6 +75,7 @@ describe("config", () => {
     expect(c.slots.bee4).toMatchObject({ style: "scalpy", name: "Dash", fromSetup: false });
     expect(c.slots.bee5).toMatchObject({ style: "scalpy", name: "Zip", fromSetup: false });
     expect(c.slots.bee6).toMatchObject({ style: "fade", name: "Rook", fromSetup: false });
+    expect(c.slots.bee7).toMatchObject({ style: "bounce", name: "Echo", fromSetup: false });
     expect(loadConfig({ TYPESAFE_API_KEY: "env" }, settings).jev.apiKey).toBe("env");
   });
 
@@ -84,6 +86,7 @@ describe("config", () => {
     expect(c.bees.breezy).toMatchObject({ maxTradesPerDay: 3, feeBudgetUsdDay: 1, maxFlatMinutes: 0, cooldownMinutes: 240 });
     expect(c.bees.scalpy).toMatchObject({ maxTradesPerDay: 80, feeBudgetUsdDay: 20, spreadGateBps: 5, cooldownMinutes: 5, stopAtrMult: 0.75, maxFlatMinutes: 0 });
     expect(c.bees.fade).toMatchObject({ maxTradesPerDay: 3, feeBudgetUsdDay: 3, spreadGateBps: 5, cooldownMinutes: 120, stopAtrMult: 2, maxFlatMinutes: 0 });
+    expect(c.bees.bounce).toMatchObject({ maxTradesPerDay: 3, feeBudgetUsdDay: 3, spreadGateBps: 10, cooldownMinutes: 120, stopAtrMult: 1.5, maxFlatMinutes: 0 });
     expect(c.tickMs).toBe(10_000);
     expect(c.jev.dailyUsdCap).toBe(2);
     expect(c.dataRefreshMs).toBe(60_000);
@@ -103,7 +106,7 @@ describe("openrouter timeout", () => {
 
 describe("paper mode (Alpaca)", () => {
   const keys: Record<string, string> = { TYPESAFE_API_KEY: "k", DRY_RUN: "false", MODE: "paper" };
-  for (const b of ["BEE1", "BEE2", "BEE3", "BEE4", "BEE5", "BEE6"]) {
+  for (const b of ["BEE1", "BEE2", "BEE3", "BEE4", "BEE5", "BEE6", "BEE7"]) {
     keys[`${b}_ALPACA_API_KEY`] = `${b}-key`;
     keys[`${b}_ALPACA_API_SECRET`] = `${b}-secret`;
   }
@@ -128,6 +131,7 @@ describe("paper mode (Alpaca)", () => {
     expect(msg).toMatch(/BEE4_ALPACA_API_KEY/);
     expect(msg).toMatch(/BEE5_ALPACA_API_SECRET/);
     expect(msg).toMatch(/BEE6_ALPACA_API_KEY/);
+    expect(msg).toMatch(/BEE7_ALPACA_API_SECRET/);
   });
   it("needs no LIVE_ACK (paper is not real money)", () => {
     expect(loadConfig(keys).mode).toBe("paper");

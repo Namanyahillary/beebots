@@ -66,8 +66,8 @@ interface Props {
   decisions?: DecisionEvent[];
 }
 
-const STYLE_LABEL: Record<string, string> = { bizzy: "Breakout", breezy: "Trend", boozy: "Momentum", scalpy: "Scalp", fade: "Fade" };
-const DEFAULT_STYLE: Record<BeeName, string> = { bee1: "bizzy", bee2: "breezy", bee3: "boozy", bee4: "scalpy", bee5: "scalpy", bee6: "fade" };
+const STYLE_LABEL: Record<string, string> = { bizzy: "Breakout", breezy: "Trend", boozy: "Momentum", scalpy: "Scalp", fade: "Fade", bounce: "Revert" };
+const DEFAULT_STYLE: Record<BeeName, string> = { bee1: "bizzy", bee2: "breezy", bee3: "boozy", bee4: "scalpy", bee5: "scalpy", bee6: "fade", bee7: "bounce" };
 
 /** Per-trigger explainers: the chip tapped decides the content (used to be hardcoded Stinger for every chip). */
 const TRIGGER_INFO: Record<string, { title: string; head: string; body: ReactNode }> = {
@@ -164,6 +164,42 @@ const TRIGGER_INFO: Record<string, { title: string; head: string; body: ReactNod
           <dd>Extremes only, a few times a week at most. Flat for days is expected, and the 20-fade gate judges the style.</dd>
         </dl>
         <p>No trigger fired yet means no crowd worth fading, not a broken one.</p>
+      </>
+    ),
+  },
+  oversoldbounce: {
+    title: "What is oversold-bounce?",
+    head: "Oversold-bounce revert trigger",
+    body: (
+      <>
+        <p>Oversold-bounce is Echo long trigger: buying the stretched selloff.</p>
+        <dl>
+          <dt>Rule</dt>
+          <dd>Long only when RSI drops below 30 with price outside the lower Bollinger band — and never into crowded longs (funding z above 1.5 vetoes).</dd>
+          <dt>Wide stops</dt>
+          <dd>Stretches extend, so the stop sits at 1.5x ATR and the revert dies in 8 hours if it becomes a regime instead of a stretch.</dd>
+          <dt>Revival</dt>
+          <dd>This was the building's first strategy, retired and promoted back. The 20-revert gate judges it.</dd>
+        </dl>
+        <p>No trigger fired yet means nothing stretched enough, not a broken one.</p>
+      </>
+    ),
+  },
+  overboughtfade: {
+    title: "What is overbought-fade?",
+    head: "Overbought-fade revert trigger",
+    body: (
+      <>
+        <p>Overbought-fade is Echo short trigger: shorting the stretched rally.</p>
+        <dl>
+          <dt>Rule</dt>
+          <dd>Short only when RSI tops 70 with price above the upper Bollinger band.</dd>
+          <dt>Wide stops</dt>
+          <dd>Stretches extend, so the stop sits at 1.5x ATR and the revert dies in 8 hours if it becomes a regime instead of a stretch.</dd>
+          <dt>Revival</dt>
+          <dd>This was the building's first strategy, retired and promoted back. The 20-revert gate judges it.</dd>
+        </dl>
+        <p>No trigger fired yet means nothing stretched enough, not a broken one.</p>
       </>
     ),
   },
@@ -269,6 +305,23 @@ function EngineHelp({ styleId }: { styleId: string }) {  if (styleId === "breezy
           <dd>Wide 2x ATR stops because crowds overshoot, trim half at +1R, close the rest at +2R, breakeven at +0.75R, dead at 6 hours.</dd>
           <dt>Gate</dt>
           <dd>At 20 resolved fades the book judges it: expectancy above zero net of fees keeps it, otherwise it is killed. No extensions.</dd>
+        </dl>
+        <p>Watch this when you compare what each slot is built to do.</p>
+      </Help>
+    );
+  if (styleId === "bounce")
+    return (
+      <Help title="Engine: Revert">
+        <p>This badge names the strategy this slot runs.</p>
+        <dl>
+          <dt>Universe</dt>
+          <dd>It buys stretched selloffs and shorts stretched rallies on every liquid coin: RSI under 30 outside the lower band, or over 70 above the upper band.</dd>
+          <dt>Revival</dt>
+          <dd>This was the building's first strategy, retired into reference code and promoted back with modern gates: risk-normalized sizing, R-ladder exits, an 8-hour time stop.</dd>
+          <dt>Exits</dt>
+          <dd>Wide 1.5x ATR stops because stretches extend, trim half at +1R, close the rest at +2R, breakeven at +0.75R, dead in 8 hours.</dd>
+          <dt>Gate</dt>
+          <dd>At 20 resolved reverts the book judges it: expectancy above zero net of fees keeps it, otherwise it is killed. No extensions.</dd>
         </dl>
         <p>Watch this when you compare what each slot is built to do.</p>
       </Help>

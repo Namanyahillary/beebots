@@ -47,6 +47,8 @@ export const BRAND = {
     slot5Glow: "rgba(34, 211, 238, 0.45)",
     slot6: "#ec4899",
     slot6Glow: "rgba(236, 72, 153, 0.45)",
+    slot7: "#a3e635",
+    slot7Glow: "rgba(163, 230, 53, 0.45)",
   },
 
   /** Fragment for OpenAI image generator to create wolf character portraits in matching style */
@@ -107,6 +109,15 @@ export const BRAND = {
       color: "var(--fade)",
       glow: "var(--fade-glow)",
       img: "/bees/fade.jpg",
+    },
+    bee7: {
+      name: "Echo",
+      tagline: "the snap-back",
+      styleLabel: "Revert",
+      blurb: "Mean reversion: buys stretched selloffs, shorts stretched rallies. The building's first strategy, revived.",
+      color: "var(--bounce)",
+      glow: "var(--bounce-glow)",
+      img: "/bees/bounce.jpg",
     },
   },
 

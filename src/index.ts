@@ -31,7 +31,7 @@ const REF_DIR = process.env.REF_DIR?.trim() || "./dashboard/public/bees";
 
 /** Names, rules, styles and pictures for the dashboard. */
 /** Portrait URL for an official bee, keyed by wolf name (not style slot). Null = not painted yet (the dashboard shows the placeholder mark). */
-const OFFICIAL_ART: Record<string, string | null> = { grim: "/bees/grim.jpg", blaze: "/bees/blaze.jpg", silver: "/bees/silver.jpg", dash: null, zip: null, rook: null };
+const OFFICIAL_ART: Record<string, string | null> = { grim: "/bees/grim.jpg", blaze: "/bees/blaze.jpg", silver: "/bees/silver.jpg", dash: null, zip: null, rook: null, echo: null };
 function officialArt(name: string, style: string): string | null {
   const key = name.trim().toLowerCase();
   if (key in OFFICIAL_ART) return OFFICIAL_ART[key]!;

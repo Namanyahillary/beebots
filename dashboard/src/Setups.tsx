@@ -4,7 +4,7 @@ import { Help } from "./Help";
 import { scoutAge } from "./Scout";
 import type { DecisionEvent } from "./types";
 
-const TRIGGER = /^(STINGER|BREAKOUT|SCALP|FADE)_/;
+const TRIGGER = /^(STINGER|BREAKOUT|SCALP|FADE|BOUNCE)_/;
 const WINDOW = 50;
 
 interface SetupRow {
