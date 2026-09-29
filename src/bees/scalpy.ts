@@ -134,7 +134,7 @@ export const scalpy: BeeBrain = {
   idleDetail(ctx): IdleDetail | null {
     if (ctx.bee.position) return null;
     const own = nearestOwn(ctx);
-    return own ? { label: "Stalking the micro-break", coin: own.coin, pctAway: own.pct, midPx: own.mid } : null;
+    return own ? { label: "Micro-break", coin: own.coin, pctAway: own.pct, midPx: own.mid } : null;
   },
 
   universe(ctx) {

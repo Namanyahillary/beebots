@@ -189,7 +189,7 @@ describe("scalpy status (idle lines, no Jev spend)", () => {
   it("flat status names the nearest micro-high; detail carries the watched price", () => {
     const c = ctx("scalpy", bee("scalpy"), view([coin("BTC", wide, 99)]));
     expect(scalpy.idleStatus!(c)).toBe("BTC is 0.81% from its micro-high");
-    expect(scalpy.idleDetail!(c)).toMatchObject({ label: "Stalking the micro-break", coin: "BTC", midPx: 99 });
+    expect(scalpy.idleDetail!(c)).toMatchObject({ label: "Micro-break", coin: "BTC", midPx: 99 });
   });
   it("positioned status names the ride; no proximity bar while holding", () => {
     const s = coin("BTC", wide, 100);
