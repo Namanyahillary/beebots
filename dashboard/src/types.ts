@@ -187,7 +187,7 @@ export const BEE_META: Record<BeeName, BeeMeta> = {
   bee2: { short: "Silver", tagline: "the calculated one", styleLabel: "Trend", rules: "", coins: [], img: "/bees/silver.jpg", color: "var(--breezy)", glow: "var(--breezy-glow)" },
   bee3: { short: "Blaze", tagline: "the degen", styleLabel: "Momentum", rules: "", coins: [], img: "/bees/blaze.jpg", color: "var(--boozy)", glow: "var(--boozy-glow)" },
   /** Until Dash's portrait is painted, the placeholder mark (spec: BEE_MARK_URL until painted). */
-  bee4: { short: "Dash", tagline: "the quick one", styleLabel: "Scalp", rules: "", coins: [], img: BEE_MARK_URL, color: "var(--scalpy)", glow: "var(--scalpy-glow)" },
+  bee4: { short: "Ash", tagline: "buys the dip", styleLabel: "Pullback", rules: "", coins: [], img: BEE_MARK_URL, color: "var(--pullback)", glow: "var(--pullback-glow)" },
   /** Zip shares Dash's playbook from the slot beside him — same placeholder deal. */
   bee5: { short: "Zip", tagline: "the restless one", styleLabel: "Scalp", rules: "", coins: [], img: BEE_MARK_URL, color: "var(--zippy)", glow: "var(--zippy-glow)" },
   /** Rook fades crowded positioning — placeholder until painted. */

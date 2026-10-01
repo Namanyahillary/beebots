@@ -288,7 +288,7 @@ describe("finishDesign", () => {
 
 describe("settings", () => {
   it("reserves the official names in their obvious spellings only", () => {
-    for (const n of ["Blaze", "blaze-bee", "Blaze Bee", "SILVER", "Silver bee", "Grim", "Grimm", "Dash", "Dash Bee", "Zip", "ZIP", "Rook", "Rook Bee", "Echo", "ECHO"]) expect(isReservedName(n), n).toBe(true);
+    for (const n of ["Blaze", "blaze-bee", "Blaze Bee", "SILVER", "Silver bee", "Grim", "Grimm", "Dash", "Dash Bee", "Zip", "ZIP", "Rook", "Rook Bee", "Echo", "ECHO", "Ash", "ASH"]) expect(isReservedName(n), n).toBe(true);
     for (const n of ["Buzzy", "Beatrice", "Bee", "Boozer", "Breeze", "Donny"]) expect(isReservedName(n), n).toBe(false);
   });
 

@@ -4,8 +4,9 @@ import { boozy } from "./boozy.js";
 import { bounce } from "./bounce.js";
 import { breezy } from "./breezy.js";
 import { fade } from "./fade.js";
+import { pullback } from "./pullback.js";
 import { scalpy } from "./scalpy.js";
 import type { BeeBrain } from "./types.js";
 
 /** One brain per trading style. */
-export const BRAINS: Record<StyleId, BeeBrain> = { bizzy, breezy, boozy, scalpy, fade, bounce };
+export const BRAINS: Record<StyleId, BeeBrain> = { bizzy, breezy, boozy, scalpy, fade, bounce, pullback };

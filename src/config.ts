@@ -1,15 +1,15 @@
 import { z } from "zod";
 import { SLOT_IDENTITY, STYLE_INFO, STYLES, type Settings, type StyleId } from "./settings.js";
 
-/** Seven bee slots. bee1-3 trade the Setup wolves' styles (or the original three); bee4/bee5 scalp side by side; bee6 fades crowded positioning; bee7 reverts price stretches. */
+/** Seven bee slots. bee1-3 trade the Setup wolves' styles (or the original three); bee4 hunts trend dips; bee5 stays benched (scalp postmortem); bee6 fades crowded positioning; bee7 reverts price stretches. */
 export const BEES = ["bee1", "bee2", "bee3", "bee4", "bee5", "bee6", "bee7"] as const;
 export type BeeId = (typeof BEES)[number];
 export { STYLES, type StyleId };
 /** Slots the Setup page raises and paints (bee4-bee7 are built-in and need no portraits). */
 export const SETUP_BEES: ReadonlyArray<BeeId> = ["bee1", "bee2", "bee3"];
 
-/** With no Setup file (settings only from .env), the bees are the original seven. */
-const DEFAULT_SLOTS: Record<BeeId, StyleId> = { bee1: "bizzy", bee2: "breezy", bee3: "boozy", bee4: "scalpy", bee5: "scalpy", bee6: "fade", bee7: "bounce" };
+/** With no Setup file (settings only from .env), the bees are the original seven (bee5 stays benched). */
+const DEFAULT_SLOTS: Record<BeeId, StyleId> = { bee1: "bizzy", bee2: "breezy", bee3: "boozy", bee4: "pullback", bee5: "scalpy", bee6: "fade", bee7: "bounce" };
 /** Typed as the only acknowledgement that unlocks MODE=live. */
 export const LIVE_ACK_PHRASE = "I-ACCEPT-REAL-MONEY-RISK";
 
@@ -43,7 +43,7 @@ const opt = z
   .optional()
   .transform((v) => (v === undefined || v.trim() === "" ? undefined : v.trim()));
 
-// Per-style knobs: BIZZY_* = Breakout, BREEZY_* = Trend, BOOZY_* = Momentum, SCALPY_* = Scalp, FADE_* = Fade, BOUNCE_* = Revert. Every bee on that style uses them.
+// Per-style knobs: BIZZY_* = Breakout, BREEZY_* = Trend, BOOZY_* = Momentum, SCALPY_* = Scalp, FADE_* = Fade, BOUNCE_* = Revert, PULLBACK_* = Pullback. Every bee on that style uses them.
 const perStyle = (prefix: string, d: { trades: number; fee: number; spread: number; cooldown: number; stopAtr: number; maxFlat: number }) => ({
   [`${prefix}_MAX_TRADES_PER_DAY`]: num(d.trades),
   [`${prefix}_FEE_BUDGET_USD_DAY`]: num(d.fee),
@@ -127,6 +127,7 @@ const EnvSchema = z.object({
   ...perStyle("SCALPY", { trades: 0, fee: 20.0, spread: 5, cooldown: 5, stopAtr: 0.75, maxFlat: 0 }),
   ...perStyle("FADE", { trades: 3, fee: 3.0, spread: 5, cooldown: 120, stopAtr: 2, maxFlat: 0 }),
   ...perStyle("BOUNCE", { trades: 15, fee: 15.0, spread: 10, cooldown: 120, stopAtr: 1.5, maxFlat: 0 }),
+  ...perStyle("PULLBACK", { trades: 4, fee: 3.0, spread: 5, cooldown: 60, stopAtr: 2, maxFlat: 0 }),
   ...perSlot("BEE1"),
   ...perSlot("BEE2"),
   ...perSlot("BEE3"),
@@ -356,7 +357,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, settings: Setti
       takerFeeRate: e.TAKER_FEE_RATE,
     },
     universe: { min24hVolUsd: e.MIN_24H_VOL_USD, allowNonCrypto: e.ALLOW_NON_CRYPTO },
-    bees: { bizzy: knobs("bizzy"), breezy: knobs("breezy"), boozy: knobs("boozy"), scalpy: knobs("scalpy"), fade: knobs("fade"), bounce: knobs("bounce") },
+    bees: { bizzy: knobs("bizzy"), breezy: knobs("breezy"), boozy: knobs("boozy"), scalpy: knobs("scalpy"), fade: knobs("fade"), bounce: knobs("bounce"), pullback: knobs("pullback") },
     breezy: { minOpenProb: e.BREEZY_MIN_OPEN_PROB, minSizeUsd: e.BREEZY_MIN_SIZE_USD },
     bizzy: { sizeFraction: e.BIZZY_SIZE_FRACTION, universeSize: e.BIZZY_UNIVERSE_SIZE, timeStopMinutes: e.BIZZY_TIME_STOP_MINUTES },
     boozy: { candidates: e.BOOZY_CANDIDATES },

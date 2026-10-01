@@ -66,8 +66,8 @@ interface Props {
   decisions?: DecisionEvent[];
 }
 
-const STYLE_LABEL: Record<string, string> = { bizzy: "Breakout", breezy: "Trend", boozy: "Momentum", scalpy: "Scalp", fade: "Fade", bounce: "Revert" };
-const DEFAULT_STYLE: Record<BeeName, string> = { bee1: "bizzy", bee2: "breezy", bee3: "boozy", bee4: "scalpy", bee5: "scalpy", bee6: "fade", bee7: "bounce" };
+const STYLE_LABEL: Record<string, string> = { bizzy: "Breakout", breezy: "Trend", boozy: "Momentum", scalpy: "Scalp", fade: "Fade", bounce: "Revert", pullback: "Pullback" };
+const DEFAULT_STYLE: Record<BeeName, string> = { bee1: "bizzy", bee2: "breezy", bee3: "boozy", bee4: "pullback", bee5: "scalpy", bee6: "fade", bee7: "bounce" };
 
 /** Per-trigger explainers: the chip tapped decides the content (used to be hardcoded Stinger for every chip). */
 const TRIGGER_INFO: Record<string, { title: string; head: string; body: ReactNode }> = {
@@ -203,6 +203,42 @@ const TRIGGER_INFO: Record<string, { title: string; head: string; body: ReactNod
       </>
     ),
   },
+  trenddip: {
+    title: "What is trend-dip?",
+    head: "Trend-dip pullback trigger",
+    body: (
+      <>
+        <p>Trend-dip is Ash long trigger: buying a mild dip inside an established weekly uptrend.</p>
+        <dl>
+          <dt>Rule</dt>
+          <dd>Long only with a +8% 7-day trend, RSI 30-42, price in the lower band slice (0-0.25), funding not crowded, and no 1h dump behind it.</dd>
+          <dt>Wide stops</dt>
+          <dd>Trends resume slowly, so the stop sits at 2x ATR (80bp floor) and the pullback dies in 12 hours if it was a reversal instead of a dip.</dd>
+          <dt>Gate</dt>
+          <dd>The 40-pullback gate judges the style. No extensions.</dd>
+        </dl>
+        <p>No trigger fired yet means no trend worth dipping into, not a broken one.</p>
+      </>
+    ),
+  },
+  trendrallyfade: {
+    title: "What is trend-rally-fade?",
+    head: "Trend-rally-fade pullback trigger",
+    body: (
+      <>
+        <p>Trend-rally-fade is Ash short trigger: fading a mild rally inside an established weekly downtrend.</p>
+        <dl>
+          <dt>Rule</dt>
+          <dd>Short only with a -8% 7-day trend, RSI 58-70, price in the upper band slice (0.75-1), funding not crowded, and no 1h dump behind it.</dd>
+          <dt>Wide stops</dt>
+          <dd>Trends resume slowly, so the stop sits at 2x ATR (80bp floor) and the pullback dies in 12 hours if it was a reversal instead of a dip.</dd>
+          <dt>Gate</dt>
+          <dd>The 40-pullback gate judges the style. No extensions.</dd>
+        </dl>
+        <p>No trigger fired yet means no trend worth dipping into, not a broken one.</p>
+      </>
+    ),
+  },
 };
 
 const triggerKey = (label: string) => label.toLowerCase().replace(/[^a-z]/g, "");
@@ -322,6 +358,23 @@ function EngineHelp({ styleId }: { styleId: string }) {  if (styleId === "breezy
           <dd>Wide 1.5x ATR stops because stretches extend, trim half at +1R, close the rest at +2R, breakeven at +0.75R, dead in 8 hours.</dd>
           <dt>Gate</dt>
           <dd>At 20 resolved reverts the book judges it: expectancy above zero net of fees keeps it, otherwise it is killed. No extensions.</dd>
+        </dl>
+        <p>Watch this when you compare what each slot is built to do.</p>
+      </Help>
+    );
+  if (styleId === "pullback")
+    return (
+      <Help title="Engine: Pullback">
+        <p>This badge names the strategy this slot runs.</p>
+        <dl>
+          <dt>Universe</dt>
+          <dd>It buys mild dips inside established weekly trends on every liquid coin: 7-day trend ±8% with RSI 30-42 inside the bands and funding not crowded.</dd>
+          <dt>Fee-triangle favorite</dt>
+          <dd>2R targets at ~0.05R tolls need only +1.6pp of edge — the most headroom of any style here.</dd>
+          <dt>Exits</dt>
+          <dd>Wide 2x ATR stops with an 80bp floor, single exit at +2R, breakeven at +1R, dead in 12 hours.</dd>
+          <dt>Gate</dt>
+          <dd>At 40 resolved pullbacks the book judges it: expectancy above zero and 35%+ wins keeps it, otherwise it is killed. No extensions.</dd>
         </dl>
         <p>Watch this when you compare what each slot is built to do.</p>
       </Help>

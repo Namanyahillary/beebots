@@ -222,6 +222,16 @@ with modern gates: strict RSI-outside-band doubles only, funding veto on longs,
 extremes); same-side fills attribute per bee for comparison. Decision gate at 20
 resolved reverts: expectancy > 0 net of fees keeps it, else kill with postmortem.
 
+## Pullback, bee4 (shipped 2026-10-01 — gate open, judgement at 40 pullbacks)
+
+bee4 "Ash" runs `pullback` from `strategies/PULLBACK.md` (LIVE) — the Opus-consulted
+replacement for the dead scalp slot: buys mild 15m dips inside established 7-day
+trends with funding NOT crowded (mirror of Rook's rule), mirrored short. 1%
+risk, 2× ATR stops with an 80bp floor, single exit at +2R, BE +1R, 12h time stop,
+4/day $3 budget, rule-driven. Fee-triangle favorite (+1.6pp edge needed at 41×
+toll). bee5 stays benched. Early kill at 15 if expectancy ≤ -0.3R; gate at 40
+(keep on expectancy > 0 and 35%+ wins). Rook untouched by the whole operation.
+
 ## Is Jev doing good or bad (shipped 2026-09-29 — measurement, not verdict)
 
 Two instruments, both descriptive until samples mature:

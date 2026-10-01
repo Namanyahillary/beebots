@@ -66,31 +66,30 @@ describe("engine stamps entryDecisionId on opens and close fills", () => {
     });
     const exec = new SimExecutor(() => ({ tickers: V.tickers, instruments: V.instruments }), 0.0005, () => NOW);
     const engine = new Engine({ cfg, db, feed, jev, exec, bus, alerts: new Alerts(undefined), now: () => NOW });
-    // Odd UTC hour → bee4 holds first pick on the single setup.
-    const odd = NOW + 3_600_000;
-    engine.bees["bee4"] = { ...bee("scalpy"), id: "bee4" };
+    // Even hour (NOW) → bee5 holds first pick on the single setup.
+    engine.bees["bee5"] = { ...bee("scalpy"), id: "bee5" };
     type E = {
       decide(id: string, now: number): Promise<void>;
       order(id: string, decisionId: number, instId: string, side: "buy" | "sell", contracts: number, reduceOnly: boolean, purpose: string): Promise<boolean>;
     };
     const e = engine as unknown as E;
-    const feed2 = { view: () => V, lastRefreshAt: odd } as never;
+    const feed2 = { view: () => V, lastRefreshAt: NOW } as never;
     (engine as unknown as { d: { feed: unknown } }).d.feed = feed2;
-    (engine as unknown as { now: () => number }).now = () => odd;
-    await e.decide("bee4", odd);
-    const pos = engine.bees["bee4"]!.position;
+    (engine as unknown as { now: () => number }).now = () => NOW;
+    await e.decide("bee5", NOW);
+    const pos = engine.bees["bee5"]!.position;
     expect(pos?.coin).toBe("BTC");
     const openDid = pos!.entryDecisionId;
     expect(openDid).toBeGreaterThan(0);
     // Close it all out under a fresh decision id.
-    const closeDid = db.insertDecision({ bee: "bee4", ts: odd, choice: "test", forcedBy: null, ...DEC });
-    await e.order("bee4", closeDid, pos!.instId, "sell", pos!.contracts, true, "test_close");
-    expect(engine.bees["bee4"]!.position).toBeNull();
+    const closeDid = db.insertDecision({ bee: "bee5", ts: NOW, choice: "test", forcedBy: null, ...DEC });
+    await e.order("bee5", closeDid, pos!.instId, "sell", pos!.contracts, true, "test_close");
+    expect(engine.bees["bee5"]!.position).toBeNull();
     const fills = db.raw.prepare(`SELECT realised_usd AS r, entry_decision_id AS e FROM fills ORDER BY id`).all() as Array<{ r: number; e: number | null }>;
     const closes = fills.filter((f) => f.e !== null);
     expect(closes.length).toBeGreaterThan(0);
     expect(closes.every((f) => f.e === openDid)).toBe(true);
     const rows = db.closeAttribution();
-    expect(rows.some((r) => r.bee === "bee4" && r.source === "rule")).toBe(true);
+    expect(rows.some((r) => r.bee === "bee5" && r.source === "rule")).toBe(true);
   });
 });

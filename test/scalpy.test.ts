@@ -213,7 +213,7 @@ describe("scalpy status (idle lines, no Jev spend)", () => {
 });
 
 describe("ruleDriven decide: the code takes the setup, Jev is never called", () => {
-  async function scalpyHarness(px: number, slot: "bee4" | "bee5" = "bee4", now = NOW) {
+  async function scalpyHarness(px: number, slot: "bee4" | "bee5" = "bee5", now = NOW) {
     const { Db } = await import("../src/db.js");
     const { EventBus } = await import("../src/events.js");
     const { SimExecutor } = await import("../src/exec/executor.js");
@@ -240,20 +240,19 @@ describe("ruleDriven decide: the code takes the setup, Jev is never called", () 
     return { decide: (t: number) => e.decide(slot, t), made: () => e.jevMade[slot] ?? 0, status: () => e.last[slot]?.status ?? "", choice: () => e.last[slot]?.choice ?? null, engine, jev };
   }
   it("opens SCALP_BTC with zero Jev calls", async () => {
-    // Odd UTC hour → bee4 holds first pick on the single setup.
-    const odd = NOW + 3_600_000;
-    const { decide, made, status, choice, engine } = await scalpyHarness(100, "bee4", odd);
-    await decide(odd);
+    // Even hour (NOW) → bee5 holds first pick on the single setup.
+    const { decide, made, status, choice, engine } = await scalpyHarness(100, "bee5", NOW);
+    await decide(NOW);
     expect(made()).toBe(0);
-    expect(engine.bees["bee4"]!.position?.coin).toBe("BTC");
+    expect(engine.bees["bee5"]!.position?.coin).toBe("BTC");
     expect(status()).toContain("SCALP_BTC");
     expect(choice()).toBe("SCALP_BTC"); // takes record their setup (Setups scoreboard counts picks)
   });
   it("flat with no trigger: zero Jev calls, status watches the micro-high", async () => {
-    const { decide, made, status, engine } = await scalpyHarness(99);
+    const { decide, made, status, engine } = await scalpyHarness(99, "bee5");
     await decide(NOW);
     expect(made()).toBe(0);
-    expect(engine.bees["bee4"]!.position).toBeNull();
+    expect(engine.bees["bee5"]!.position).toBeNull();
     expect(status()).toContain("micro-high");
   });
   it("bee5 (Zip) trades the same playbook on its own book", async () => {
@@ -264,12 +263,11 @@ describe("ruleDriven decide: the code takes the setup, Jev is never called", () 
     expect(status()).toContain("SCALP_BTC");
   });
   it("a tripped Jev spend cap does not veto rule-driven bees (they spend $0)", async () => {
-    const odd = NOW + 3_600_000;
-    const h = await scalpyHarness(100, "bee4", odd);
+    const h = await scalpyHarness(100, "bee5", NOW);
     Object.defineProperty(h.jev, "capTripped", { value: true, configurable: true });
-    await h.decide(odd);
+    await h.decide(NOW);
     expect(h.made()).toBe(0);
-    expect(h.engine.bees["bee4"]!.position?.coin).toBe("BTC");
+    expect(h.engine.bees["bee5"]!.position?.coin).toBe("BTC");
     expect(h.status()).not.toMatch(/daily cap/);
   });
 });

@@ -49,7 +49,7 @@ describe("config", () => {
     expect(c.slots.bee1).toMatchObject({ style: "bizzy", name: "Grim", customImage: false });
     expect(c.slots.bee2).toMatchObject({ style: "breezy", name: "Silver" });
     expect(c.slots.bee3).toMatchObject({ style: "boozy", name: "Blaze" });
-    expect(c.slots.bee4).toMatchObject({ style: "scalpy", name: "Dash", customImage: false, fromSetup: false });
+    expect(c.slots.bee4).toMatchObject({ style: "pullback", name: "Ash", customImage: false, fromSetup: false });
     expect(c.slots.bee5).toMatchObject({ style: "scalpy", name: "Zip", customImage: false, fromSetup: false });
     expect(c.slots.bee6).toMatchObject({ style: "fade", name: "Rook", customImage: false, fromSetup: false });
     expect(c.slots.bee7).toMatchObject({ style: "bounce", name: "Echo", customImage: false, fromSetup: false });
@@ -72,7 +72,7 @@ describe("config", () => {
     expect(c.mode).toBe("dry");
     expect(c.slots.bee1).toMatchObject({ name: "Granny", style: "breezy", customImage: true, rules: "Buy BTC dips.", coins: ["BTC"], fromSetup: true });
     expect(c.slots.bee3.style).toBe("boozy");
-    expect(c.slots.bee4).toMatchObject({ style: "scalpy", name: "Dash", fromSetup: false });
+    expect(c.slots.bee4).toMatchObject({ style: "pullback", name: "Ash", fromSetup: false });
     expect(c.slots.bee5).toMatchObject({ style: "scalpy", name: "Zip", fromSetup: false });
     expect(c.slots.bee6).toMatchObject({ style: "fade", name: "Rook", fromSetup: false });
     expect(c.slots.bee7).toMatchObject({ style: "bounce", name: "Echo", fromSetup: false });

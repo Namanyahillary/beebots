@@ -5,8 +5,8 @@ import { chmodSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSy
 import { dirname } from "node:path";
 import { z } from "zod";
 
-export const STYLES = ["bizzy", "breezy", "boozy", "scalpy", "fade", "bounce"] as const;
-/** A trading style is one of the six built-in strategies, named after the bee that first traded it. */
+export const STYLES = ["bizzy", "breezy", "boozy", "scalpy", "fade", "bounce", "pullback"] as const;
+/** A trading style is one of the seven built-in strategies, named after the bee that first traded it. */
 export type StyleId = (typeof STYLES)[number];
 
 export const STYLE_INFO: Record<StyleId, { label: string; blurb: string; name: string; tagline: string }> = {
@@ -45,6 +45,12 @@ export const STYLE_INFO: Record<StyleId, { label: string; blurb: string; name: s
     blurb: "Mean reversion: buys stretched selloffs (RSI under 30, outside the band) and shorts stretched rallies. The building's first strategy, revived with modern gates.",
     name: "Echo",
     tagline: "the snap-back",
+  },
+  pullback: {
+    label: "Pullback",
+    blurb: "Buys mild dips inside established weekly trends with funding NOT crowded. The fee-triangle favorite: 2R targets at ~0.05R tolls.",
+    name: "Ash",
+    tagline: "buys the dip",
   },
 };
 
