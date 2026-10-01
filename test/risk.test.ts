@@ -127,8 +127,7 @@ describe("trade cap and fee budget: hold or close only", () => {
   });
 
   it("a zero trade cap benches permanently (retired style: 0 used >= 0 allowed)", () => {
-    const cfg = testConfig({ SCALPY_MAX_TRADES_PER_DAY: "0" });
-    expect(evaluateCaps(ctx("scalpy", bee("scalpy"), view([]), cfg)).cap).toBe("trade_cap");
+    expect(evaluateCaps(ctx("scalpy", bee("scalpy", { tradesToday: 0 }), V)).cap).toBe("trade_cap");
   });
 
   it("still allows a close when capped", () => {

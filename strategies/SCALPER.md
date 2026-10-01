@@ -1,6 +1,6 @@
 # SCALPY — fast day-trader (4th style, proposed)
 
-Status: CALIBRATION v2 since 2026-09-29 (retired 9/28, un-benched 9/29 — paper costs nothing and entry selectivity was never tested). Dash = frozen control (retired ladder config). Zip = fresh-only variant (skips exhausted thrusts, yields on deterministic collision with Dash's pick). Next 30 combined decide again; expectancy ≤ 0 kills both with no third act.
+Status: RETIRED finally 2026-10-01 (killed 9/29, calibrated v2 9/29–10/01, killed again — no third act). bee4/bee5 benched at zero trades/day; books frozen as evidence.
 Built as specced with two deltas: (1) entries run through a new generic `ruleDriven`
 engine path (single setup taken as-is, zero Jev calls, all code gates still fire);
 (2) a 30bp chase guard on the micro-high (post-SOL consensus: market-take within,
@@ -107,3 +107,13 @@ Lessons carried forward (doctrine, not tweaks):
    legs like risk.
 3. Rank-splitting works (no mirrors after rotation) but cannot fix negative expectancy.
 4. Resetting books never remedies R-math; the gate judges scale-free R so paint colors don't matter.
+
+## Calibration v2 verdict (final kill, 2026-10-01)
+
+216 close fills across both books: Dash -$11.84 / $22.19 fees (120 fills),
+Zip -$46.47 / $17.49 (96 fills). Combined -$58.31 realised, $39.68 tolls.
+The fresh-only variant did not separate from the control — both bled at every
+selectivity level, confirming the triangle (0.6R targets / 1R stops / ~0.13R
+tolls) rather than the entries. Books: Dash 276 (-57), Zip 251 (-82).
+No third act: un-benching bought 200 fills of confirmation, which is itself
+data — calibration without a new thesis is just scheduled bleed.

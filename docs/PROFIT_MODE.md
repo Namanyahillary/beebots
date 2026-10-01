@@ -272,8 +272,10 @@ analysis wrongly compared the skipped trim against a full-size exit fee; post
 first-trim the size is already halved, so holding dominates trimming exactly
 when the bank can't cover the fee: equal downside, free upside.)
 
-## Scalpy verdict (retired 2026-09-29)
+## Scalpy verdict (retired 2026-09-29, killed finally 2026-10-01)
 
 bee4/bee5 benched at zero trades/day (permanent cap, stops still fire — nothing
-orphans). 78 closes: -$10.71 realised, $14.92 fees. Full postmortem in
+orphans). First verdict: 78 closes, -$10.71 realised, $14.92 fees. Calibration
+v2 (Dash control + Zip fresh-only, 9/29–10/01): 216 closes, -$58.31 realised,
+$39.68 tolls — the variant failed with the control. Full postmortem in
 strategies/SCALPER.md. Slots stay visible as evidence, not as traders.
