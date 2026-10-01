@@ -19,3 +19,12 @@ const SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120">
 
 /** Usable anywhere an image URL is (the page's CSP allows data: images). */
 export const BEE_MARK_URL = `data:image/svg+xml,${encodeURIComponent(SVG)}`;
+
+/**
+ * Per-wolf placeholder until its portrait is painted: the wolf's initial in its
+ * slot accent on the same dark tile, so unpainted wolves never all look alike.
+ */
+export function wolfMark(initial: string, accent: string): string {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120"><rect width="120" height="120" rx="60" fill="#13121a"/><circle cx="60" cy="60" r="56" fill="none" stroke="${accent}" stroke-width="5"/><text x="60" y="82" font-family="Inter,system-ui,sans-serif" font-size="58" font-weight="800" text-anchor="middle" fill="${accent}">${initial.slice(0, 1).toUpperCase()}</text></svg>`;
+  return `data:image/svg+xml,${encodeURIComponent(svg)}`;
+}

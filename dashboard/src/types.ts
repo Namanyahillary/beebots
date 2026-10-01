@@ -1,5 +1,5 @@
 // Mirrors the engine's read-only /snapshot and SSE payloads. No account data exists in these shapes.
-import { BEE_MARK_URL } from "./BeeMark";
+import { wolfMark } from "./BeeMark";
 
 /** The seven bee slots. Names, taglines and portraits come from the engine's /profile (bee1-3 set on the Setup page; bee4-bee7 are built-in). */
 export type BeeName = "bee1" | "bee2" | "bee3" | "bee4" | "bee5" | "bee6" | "bee7";
@@ -186,14 +186,14 @@ export const BEE_META: Record<BeeName, BeeMeta> = {
   bee1: { short: "Grim", tagline: "the grinder", styleLabel: "Breakout", rules: "", coins: [], img: "/bees/grim.jpg", color: "var(--bizzy)", glow: "var(--bizzy-glow)" },
   bee2: { short: "Silver", tagline: "the calculated one", styleLabel: "Trend", rules: "", coins: [], img: "/bees/silver.jpg", color: "var(--breezy)", glow: "var(--breezy-glow)" },
   bee3: { short: "Blaze", tagline: "the degen", styleLabel: "Momentum", rules: "", coins: [], img: "/bees/blaze.jpg", color: "var(--boozy)", glow: "var(--boozy-glow)" },
-  /** Until Dash's portrait is painted, the placeholder mark (spec: BEE_MARK_URL until painted). */
-  bee4: { short: "Ash", tagline: "buys the dip", styleLabel: "Pullback", rules: "", coins: [], img: BEE_MARK_URL, color: "var(--pullback)", glow: "var(--pullback-glow)" },
+  /** Placeholder mark until Ash is painted (per-wolf initial, replaced by the portrait). */
+  bee4: { short: "Ash", tagline: "buys the dip", styleLabel: "Pullback", rules: "", coins: [], img: wolfMark("A", "#6366f1"), color: "var(--pullback)", glow: "var(--pullback-glow)" },
   /** Zip shares Dash's playbook from the slot beside him — same placeholder deal. */
-  bee5: { short: "Zip", tagline: "the restless one", styleLabel: "Scalp", rules: "", coins: [], img: BEE_MARK_URL, color: "var(--zippy)", glow: "var(--zippy-glow)" },
+  bee5: { short: "Zip", tagline: "the restless one", styleLabel: "Scalp", rules: "", coins: [], img: wolfMark("Z", "#22d3ee"), color: "var(--zippy)", glow: "var(--zippy-glow)" },
   /** Rook fades crowded positioning — placeholder until painted. */
-  bee6: { short: "Rook", tagline: "the contrarian", styleLabel: "Fade", rules: "", coins: [], img: BEE_MARK_URL, color: "var(--fade)", glow: "var(--fade-glow)" },
+  bee6: { short: "Rook", tagline: "the contrarian", styleLabel: "Fade", rules: "", coins: [], img: wolfMark("R", "#ec4899"), color: "var(--fade)", glow: "var(--fade-glow)" },
   /** Echo reverts price stretches — placeholder until painted. */
-  bee7: { short: "Echo", tagline: "the snap-back", styleLabel: "Revert", rules: "", coins: [], img: BEE_MARK_URL, color: "var(--bounce)", glow: "var(--bounce-glow)" },
+  bee7: { short: "Echo", tagline: "the snap-back", styleLabel: "Revert", rules: "", coins: [], img: wolfMark("E", "#a3e635"), color: "var(--bounce)", glow: "var(--bounce-glow)" },
 };
 
 export interface Profile {
@@ -216,7 +216,7 @@ export function applyProfile(p: Profile): void {
     m.styleLabel = b.styleLabel;
     m.rules = b.rules ?? "";
     m.coins = b.coins ?? [];
-    m.img = b.img ?? BEE_MARK_URL;
+    m.img = b.img ?? m.img;
   }
 }
 
