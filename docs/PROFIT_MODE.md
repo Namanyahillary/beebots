@@ -262,6 +262,19 @@ The one legitimate exit-side form is *deferral*: a rung whose bank can't cover
 its own leg waits (re-fires every tick, BE independent) instead of banking dust.
 All future styles spec their targets against this before anything else.
 
+## Correction: ladders don't multiply tolls (adversarial review 2026-10-01)
+
+An Opus review caught an overstatement in the scalp postmortem: taker tolls are
+proportional to notional, so entry + trim-half + close-half tolls 2N — exactly
+what entry + full close tolls. Ladders do NOT multiply tolls vs single exits.
+Their real cost is R-shrinkage: banking half early at lower R lowers the average
+winning R at equal toll. trimCoversFee stands (its dominance argument never
+relied on toll-multiplication), but "every rung is a full-fee leg" is retired
+as a doctrine line. The scalp verdict is unaffected — and strengthened: closes
+are gross-negative (-$58 lifetime realised *excluding* fees), so entries lost
+before tolls, not just after. Books reconcile to the cent
+(-58.31 gross -79.39 fees + funding ≈ -139).
+
 ## No dust banking (live 2026-09-29, owner call)
 
 A take-profit rung fires only if its bank covers its own toll leg
