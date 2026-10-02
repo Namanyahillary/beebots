@@ -29,17 +29,17 @@ describe("caps", () => {
   });
 
   it("trade cap trips at the max and not one below", () => {
-    expect(evaluateCaps(ctx("bizzy", bee("bizzy", { tradesToday: 1 }), V)).cap).toBe("trade_cap");
+    expect(evaluateCaps(ctx("bizzy", bee("bizzy", { tradesToday: 3 }), V)).cap).toBe("trade_cap");
     expect(evaluateCaps(ctx("bizzy", bee("bizzy", { tradesToday: 0 }), V)).cap).toBeNull();
   });
 
   it("fee budget trips when spent and not before", () => {
-    expect(evaluateCaps(ctx("bizzy", bee("bizzy", { feesTodayUsd: 1.0 }), V)).cap).toBe("fee_budget");
-    expect(evaluateCaps(ctx("bizzy", bee("bizzy", { feesTodayUsd: 0.99 }), V)).cap).toBeNull();
+    expect(evaluateCaps(ctx("bizzy", bee("bizzy", { feesTodayUsd: 3.0 }), V)).cap).toBe("fee_budget");
+    expect(evaluateCaps(ctx("bizzy", bee("bizzy", { feesTodayUsd: 2.99 }), V)).cap).toBeNull();
   });
 
   it("reports a trip only once", () => {
-    expect(evaluateCaps(ctx("bizzy", bee("bizzy", { tradesToday: 1 }), V)).tripped).toBe("trade_cap");
+    expect(evaluateCaps(ctx("bizzy", bee("bizzy", { tradesToday: 3 }), V)).tripped).toBe("trade_cap");
     expect(evaluateCaps(ctx("bizzy", bee("bizzy", { tradesToday: 6, cap: "trade_cap" }), V)).tripped).toBeNull();
   });
 
@@ -120,7 +120,7 @@ describe("Jev fail-closed", () => {
 
 describe("trade cap and fee budget: hold or close only", () => {
   it("vetoes an open when the trade cap is hit", () => {
-    const b = bee("bizzy", { tradesToday: 1 });
+    const b = bee("bizzy", { tradesToday: 3 });
     const r = run(ctx("bizzy", b, V), bizzy, prop(open(SOL.instId)));
     expect(r.vetoedBy).toBe("trade_cap");
     expect(r.action.kind).toBe("none");

@@ -12,7 +12,7 @@ export type StyleId = (typeof STYLES)[number];
 export const STYLE_INFO: Record<StyleId, { label: string; blurb: string; name: string; tagline: string }> = {
   bizzy: {
     label: "Breakout",
-    blurb: "One volatility breakout a day on BTC, ETH, SOL or HYPE, ridden to the daily close. Patient, then all in.",
+    blurb: "Up to three volatility breakouts a day on BTC, ETH, SOL or HYPE, ridden to the daily close. Patient, then all in.",
     name: "Grim",
     tagline: "the grinder",
   },

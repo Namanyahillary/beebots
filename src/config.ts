@@ -119,7 +119,7 @@ const EnvSchema = z.object({
   BOOZY_CANDIDATES: num(5),
   // Defaults = the "wider swings" rules in strategies/*.md (what the original bees ran from 2026-09-24).
   ...perStyle("BREEZY", { trades: 3, fee: 1.0, spread: 5, cooldown: 240, stopAtr: 2, maxFlat: 0 }),
-  ...perStyle("BIZZY", { trades: 1, fee: 1.0, spread: 5, cooldown: 5, stopAtr: 1.5, maxFlat: 20 }),
+  ...perStyle("BIZZY", { trades: 3, fee: 3.0, spread: 5, cooldown: 5, stopAtr: 1.5, maxFlat: 20 }),
   ...perStyle("BOOZY", { trades: 9, fee: 9.0, spread: 15, cooldown: 2, stopAtr: 2, maxFlat: 0 }),
   // SCALPY trades/day is 0: retired twice, killed finally 2026-10-01.
   // Calibration v2 (Dash control + Zip fresh-only) confirmed the geometry across

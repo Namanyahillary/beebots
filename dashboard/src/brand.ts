@@ -60,7 +60,7 @@ export const BRAND = {
       name: "Grim",
       tagline: "the patient stalker",
       styleLabel: "Breakout",
-      blurb: "One volatility breakout a day on BTC, ETH, SOL or HYPE, ridden to the daily close. Sits in silence, then strikes at full size.",
+      blurb: "Up to three volatility breakouts a day on BTC, ETH, SOL or HYPE, ridden to the daily close. Sits in silence, then strikes at full size.",
       color: "var(--bizzy)",
       glow: "var(--bizzy-glow)",
       img: "/bees/grim.jpg",

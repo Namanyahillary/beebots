@@ -103,7 +103,7 @@ const TRIGGER_INFO: Record<string, { title: string; head: string; body: ReactNod
           <dt>Rule</dt>
           <dd>Long only when price breaks above today open plus half of yesterday range.</dd>
           <dt>One shot</dt>
-          <dd>One trade a day, ridden to the UTC day close. A trigger more than 20bp past its line is a missed breakout, never chased.</dd>
+          <dd>Up to three trades a day, each ridden to the UTC day close. A trigger more than 20bp past its line is a missed breakout, never chased.</dd>
           <dt>Stinger differs</dt>
           <dd>Stinger is the challenger at the previous day high on rising volume. Fills record which one fired.</dd>
         </dl>
@@ -384,7 +384,7 @@ function EngineHelp({ styleId }: { styleId: string }) {  if (styleId === "breezy
       <p>This badge names the strategy this slot runs.</p>
       <dl>
         <dt>Universe</dt>
-        <dd>It takes one volatility breakout a day on BTC, ETH, SOL or HYPE.</dd>
+          <dd>It takes up to three volatility breakouts a day on BTC, ETH, SOL or HYPE.</dd>
         <dt>Two triggers</dt>
         <dd>Williams is the default entry at today open plus half of yesterday range. Stinger is the challenger at the previous day high on rising volume. Fills record which one fired.</dd>
         <dt>Presence</dt>
