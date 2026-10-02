@@ -251,6 +251,15 @@ Early finding: Blaze's entries are overwhelmingly code-forced (10 max_flat vs 1
 Jev pick) — the null hypothesis (Jev adds nothing over gates-plus-forcing) is
 surviving contact with the data. Verdict needs closed trades in every bucket.
 
+## One bot live first (shipped 2026-10-02 — Binance cancelled, OKX perps do both sides)
+
+Venue is per-slot now: `BEE6_MODE=live` (+ that slot's keys + `LIVE_ACK`) sends one
+bot live while the pack stays dry. Engine resolves executors per slot (shared sim
+for dry, per-venue executors otherwise; refuses to boot rather than route a slot
+to a missing executor), live ramp + paper book sizes follow the slot, funding
+polls/simulates per venue, dashboard shows ● LIVE per column. Verified: mixed
+dry/demo config refuses cleanly naming only the missing slot keys.
+
 ## Go-live limits (standing directive, owner 2026-09-29)
 
 Current per-style caps (trades/day, fee budgets) are DATA-GATHERING values,
