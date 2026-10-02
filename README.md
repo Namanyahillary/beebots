@@ -2,11 +2,11 @@
 
 [![Watch the video: I built AI trading bees with Jev](docs/video.jpg)](https://www.youtube.com/watch?v=8ijN8LGljKg)
 
-Three AI trading bees race each other on OKX perpetual futures. Every decision comes from **Jev** (TypeSafe AI's
-decision model), and every order goes through a risk layer written in plain code. A live dashboard shows each
-decision, order, fee and funding payment as it happens.
+Seven AI trading wolves race each other on OKX perpetual futures. Most decisions come from **Jev** (TypeSafe AI's
+decision model), two brains are rule-driven (the code decides, Jev is never asked), and every order goes through
+a risk layer written in plain code. A live dashboard shows each decision, order, fee and funding payment as it happens.
 
-**It runs on paper by default.** The bees use real market prices and simulated money. Nothing touches an exchange
+**It runs on paper by default.** The wolves use real market prices and simulated money. Nothing touches an exchange
 account unless you change the settings yourself, on purpose.
 
 ![The beebots dashboard: three named bees trading on paper](docs/screenshots/dashboard.jpg)
@@ -63,7 +63,7 @@ Each bee gets its own portrait, painted in the same style as the originals:
 **Copy a winning bee.** Every bee on [beebots.tech](https://beebots.tech) shows its rules with a **Copy** button. Copy
 a winner's rules and paste them into **How do you want this bee to trade?** to start from its playbook.
 
-Each bee starts with $333 of paper money. Jev spending is capped at $2 a day by default.
+Each bee starts with $333 of paper money ($100 on Alpaca paper books). Jev spending is capped at $2 a day by default.
 
 ### Already have a server?
 
@@ -117,8 +117,9 @@ Your sentence becomes two things the engine enforces, and one it passes on:
 
 - **Coins.** If your bee names coins, it only ever trades those. They must be crypto perpetuals listed on OKX EEA right
   now (Setup checks the live list and asks you to rephrase if none match).
-- **The engine it runs on.** Every bee runs on one of three built-in trading styles below. A bee limited to BTC and/or
-  ETH can run on Trend; one limited to BTC, ETH, SOL or HYPE can run on Breakout; everything else runs on Momentum,
+- **The engine it runs on.** Every bee runs on one of the built-in trading styles in [the pack](#the-pack-seven-wolves)
+  above (Setup picks from the bee's coins; see `deriveStyle` in `src/bees/custom.ts`). A bee limited to BTC and/or
+  ETH can run on Trend; one limited to breakout coins can run on Breakout; everything else runs on Momentum,
   which works on any coin.
 - **Rules.** Its rules go to Jev with every decision, and Jev follows them when picking among the moves the style
   offers. They steer the choice; they can't invent moves the style doesn't have, and the risk layer below still applies.
@@ -126,17 +127,22 @@ Your sentence becomes two things the engine enforces, and one it passes on:
 A coin still has to pass the same gates as any other (at least $1M of 24h volume, a tight spread). If your bee's coin
 doesn't, the bee just waits until it does.
 
-## The three trading styles
+## The pack (seven wolves)
 
-| style | the original bee | what it does |
-|---|---|---|
-| **Breakout** | Bizzy, the grinder | One volatility breakout a day on BTC, ETH, SOL or HYPE, ridden to the daily close. |
-| **Trend** | Breezy, the calculated one | Trend following on BTC and ETH only. Few trades, rides winners, sized by volatility. |
-| **Momentum** | Boozy, the degen | Chases the strongest 7-day mover across every liquid coin, and adds to winners. |
+| slot | wolf | style | what it does | state |
+|---|---|---|---|---|
+| bee1 | Grim, the grinder | Breakout | One volatility breakout a day on BTC, ETH, SOL or HYPE, ridden to the daily close. | live |
+| bee2 | Silver, the calculated one | Trend | Trend following on BTC and ETH only. Few trades, rides winners, sized by volatility. | live |
+| bee3 | Blaze, the degen | Momentum | Chases the strongest 7-day mover across every liquid coin, and adds to winners. | live |
+| bee4 | Ash, buys the dip | Pullback | Buys mild dips inside established weekly trends. Gate at 40. | live |
+| bee5 | Zip, the restless one | Scalp (retired) | Micro-breakout scalps. Killed 2026-10-01 after 216 closes proved the fee triangle fatal. Benched as evidence. | retired |
+| bee6 | Rook, the contrarian | Fade | Shorts crowded longs / longs washed-out shorts. Gate at 20. | live |
+| bee7 | Echo, the snap-back | Revert | Buys stretched selloffs, shorts stretched rallies. Gate at 20. | live |
 
-Bizzy, Breezy and Boozy are the official bees (they run on [beebots.tech](https://beebots.tech)), so their names and art
-are theirs; your bees get their own. Two of your bees can share a style. The full rules are in [`strategies/`](strategies/), and the rules every bee
-shares (caps, stops, "never flat for long") are in [`strategies/DRAMA_RULES.md`](strategies/DRAMA_RULES.md).
+New styles ship behind a kill-gate (a resolved-trade count + an expectancy bar, no extensions) and die with a
+postmortem when they miss it. The full rules are in [`strategies/`](strategies/), the rules every bee
+shares (caps, stops, "never flat for long") are in [`strategies/DRAMA_RULES.md`](strategies/DRAMA_RULES.md),
+and the running profit-mode log is [`docs/PROFIT_MODE.md`](docs/PROFIT_MODE.md).
 
 ## How a decision is made
 
@@ -144,7 +150,8 @@ Every tick, for every bee:
 
 1. **Look.** Live OKX market data: tickers, candles, RSI, MACD, ATR, Bollinger, Donchian, funding, open interest.
 2. **Summarise.** A small numeric snapshot of the market and the bee's own position.
-3. **Ask Jev.** Jev picks one move from a menu of moves that are actually valid right now, with probabilities.
+3. **Ask Jev — usually.** Jev picks one move from a menu of moves that are actually valid right now, with probabilities.
+   Rule-driven brains (Scalp, Fade, Revert, Pullback) skip this step entirely: the code takes the single setup as-is.
 4. **Check.** Plain code can veto, shrink or force the move: max 2x leverage, per-bee stops, a daily loss stop,
    trade caps, a fee budget, cooldowns, and a hard daily cap on Jev spending.
 5. **Record, then act.** The decision is written to SQLite before anything happens.
@@ -161,9 +168,13 @@ in [`.env.example`](.env.example). The common ones:
 | setting | default | what it does |
 |---|---|---|
 | `PUBLIC_DOMAIN` | blank | A domain pointed at your server. Caddy then gets an HTTPS certificate on its own. **Recommended**: without it, the Setup page and your keys travel over plain HTTP. |
-| `TICK_MS` | `10000` | How often each bee asks Jev. Faster is more exciting and costs more (see [docs/COSTS.md](docs/COSTS.md)). |
-| `JEV_DAILY_USD_CAP` | `2` | Hard daily cap on Jev spend. When it's hit, every bee holds until 00:00 UTC. |
-| `BEE_START_EQUITY_USD` | `333` | Paper money per bee. |
+| `TICK_MS` | `10000` | How often each bee decides. Faster is more exciting and costs more (see [docs/COSTS.md](docs/COSTS.md)). |
+| `JEV_DAILY_USD_CAP` | `2` | Hard daily cap on Jev spend. When it's hit, Jev-consulted bees hold until 00:00 UTC (rule-driven bees keep trading — they spend nothing). |
+| `BEE_START_EQUITY_USD` | `333` | Paper money per bee (`ALPACA_START_EQUITY_USD=100` on Alpaca paper books). |
+| `MODE` | `dry` | Global venue: `dry` (sim), `demo` (OKX demo keys), `live` (real money + `LIVE_ACK`), `paper` (Alpaca spot). |
+| `BEE*_MODE` | = `MODE` | Per-slot venue override, e.g. `BEE6_MODE=live`. How one bot goes live first; no slot is ever live by default. |
+| `*_MAX_TRADES_PER_DAY` | per style | Trade cap per style (`BIZZY/BOOZY/...`). `0` benches the style permanently (how retirements are enforced). |
+| `*_FEE_BUDGET_USD_DAY` | per style | Fee budget per style. Data-gathering values, not live values (see go-live directive in `docs/PROFIT_MODE.md`). |
 
 **Run Setup again** (new names, new keys, or a forgotten owner password):
 
@@ -213,14 +224,59 @@ Again: this is not financial advice, and you can lose everything.
 
 ```sh
 pnpm install
-pnpm test            # risk layer (every cap, gate and forced move, both directions), setup, redaction, indicators, ledger
+pnpm typecheck      # strict TS, no emit
+pnpm lint           # eslint, must be clean before every commit
+pnpm test            # full suite (brains, risk, ledger, engine, attribution, shadow, setup)
 pnpm universe        # the tradable coin list from live public data (no keys)
 pnpm snapshot        # each style's menu and snapshot from live data (no Jev call)
+pnpm ghost-delta     # ghost benchmark report from a DB file
+pnpm jev:value       # closed R by entry source + shadow R + Jev spend (answers "is Jev worth it")
+pnpm stall:value     # stall meter: would banking flat winners have beaten holding?
 pnpm e2e:fake-jev    # the whole engine on paper with a random fake Jev (no spend)
 pnpm dev             # the real engine on paper, with real Jev calls (Setup runs if there is no key)
 
 cd dashboard && pnpm install && pnpm dev    # http://127.0.0.1:5173, proxied to the engine
 ```
+
+Rule of the repo: `typecheck && lint && test` green before every commit, no exceptions.
+
+### The engine on this server (no Docker here)
+
+This install runs the engine directly under `tsx` (not Docker). Restart it after every engine change:
+
+```sh
+pkill -f "[t]sx.*src/index.ts"; sleep 3
+setsid nohup env DB_PATH=./data/bees-{mode}.sqlite ./node_modules/.bin/tsx --env-file-if-exists=.env src/index.ts > /tmp/beebots-engine.log 2>&1 < /dev/null & disown
+curl -s http://127.0.0.1:8080/snapshot | python3 -c "import json,sys; d=json.load(sys.stdin); print(d['mode'], [(b['bee'],b.get('style')) for b in d['bees']])"
+```
+
+The dashboard runs under vite dev (`pnpm dev --port 5173` in `dashboard/`, hot-reloads, no restart needed).
+Logs: `/tmp/beebots-engine.log` (engine), `/tmp/beebots-vite.log` (dashboard).
+
+### Project map (where what lives)
+
+| path | what |
+|---|---|
+| `src/engine.ts` | tick loop, decide/execute, risk wiring, reconcile, ghost + shadow hooks |
+| `src/risk.ts` | deterministic risk layer (vetoes, caps, TP/BE signals, fee guards) |
+| `src/bees/` | one brain per style (`bizzy/breezy/boozy/scalpy/fade/bounce/pullback.ts`) + `custom.ts` (Setup wolves) |
+| `src/market/` | OKX feed, indicators, universe gates, snapshot builder |
+| `src/exec/` | executors: sim, OKX (demo/live), Alpaca paper |
+| `src/shadow.ts` | no-Jev shadow books (the causal experiment) |
+| `src/tools/` | `jev-value`, `stall-value`, `ghost-delta`, `snapshot`, `jev-check`, `keycheck` |
+| `src/db.ts` | SQLite schema + migrations + attribution queries |
+| `dashboard/src/` | cards (`BeeColumn`), stream (`Ticker`), fills, setups, leaderboard, filters, sounds |
+| `test/` | one file per area (`bees/risk/ledger/engine-*/scalpy/fade/bounce/pullback/attribution/shadow/stall/...`) |
+| `strategies/` | one spec per style + `DRAMA_RULES.md`; retired styles keep their postmortem here |
+| `docs/` | `PROFIT_MODE.md` (running log — read this before touching strategy), `COSTS.md`, `ALPACA_PAPER.md` |
+
+### Dashboard guide (for the owner watching)
+
+- **Toolbar:** All / Flat / Open / Benched (persisted). Flat means flat *and* available; Open keeps benched riders; Benched shows capped slots.
+- **Columns scroll** horizontally behind the fixed insight rail; cards keep a 230px minimum.
+- **Setups panel:** trigger scoreboard seeded from history (`GET /setups`), so rare triggers stay visible.
+- **Trigger chips + engine badges** explain each rule on tap. Red ● LIVE marks real-money slots.
+- **Sounds:** 🔊 toggles distinct beeps for opens, profitable closes, losing closes.
 
 Build the images yourself instead of pulling them:
 
