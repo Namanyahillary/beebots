@@ -235,7 +235,13 @@ export interface EngineDeps {
   db: Db;
   feed: MarketFeed;
   jev: Jev;
-  exec: Executor;
+  /**
+   * One executor, shared by every slot (tests and single-mode installs).
+   * Production may pass `execs` instead: per-slot executors for mixed modes
+   * (one bot live while the pack stays dry). Exactly one of the two is used.
+   */
+  exec?: Executor;
+  execs?: Partial<Record<BeeId, Executor>>;
   bus: EventBus;
   alerts: Alerts;
   now?: () => number;
@@ -324,6 +330,29 @@ export class Engine {
 
   // ---------- lifecycle ----------
 
+  /** Resolved once: per-slot executors (mixed modes) or the shared one. */
+  private resolvedExecs: Record<BeeId, Executor> | null = null;
+  private execFor(id: BeeId): Executor {
+    if (!this.resolvedExecs) {
+      const single = this.d.exec;
+      if (this.d.execs) {
+        if (single) throw new Error("Engine needs exec or execs, not both");
+        const missing = BEES.filter((b) => !this.d.execs![b]);
+        if (missing.length) throw new Error(`no executor for ${missing.join(", ")}`);
+        this.resolvedExecs = this.d.execs as Record<BeeId, Executor>;
+      } else {
+        if (!single) throw new Error("Engine needs exec or execs");
+        this.resolvedExecs = Object.fromEntries(BEES.map((b) => [b, single])) as Record<BeeId, Executor>;
+      }
+    }
+    return this.resolvedExecs[id];
+  }
+
+  /** Start equity follows the slot's venue (paper books start at paper size). */
+  private startEquity(id: BeeId): number {
+    return this.d.cfg.slots[id].mode === "paper" ? this.d.cfg.paper.startEquityUsd : this.d.cfg.risk.startEquityUsd;
+  }
+
   async start(): Promise<void> {
     const { cfg, db } = this.d;
     const storedMode = db.getMeta("mode");
@@ -331,7 +360,7 @@ export class Engine {
       throw new Error(`This database was used for MODE=${storedMode}. Point DB_PATH at a separate file for MODE=${cfg.mode}.`);
     }
     db.setMeta("mode", cfg.mode);
-    if (cfg.mode === "live") {
+    if (cfg.mode === "live" || BEES.some((id) => cfg.slots[id].mode === "live")) {
       const s = db.getMeta("live_started_at");
       this.liveStartedAt = s ? Number(s) : this.now();
       if (!s) db.setMeta("live_started_at", String(this.liveStartedAt));
@@ -346,15 +375,15 @@ export class Engine {
     }
 
     for (const id of BEES) {
-      this.bees[id] = db.loadBee(id) ?? freshBee(id, cfg.risk.startEquityUsd, this.now());
-      await this.d.exec.init(id);
+      this.bees[id] = db.loadBee(id) ?? freshBee(id, this.startEquity(id), this.now());
+      await this.execFor(id).init(id);
     }
 
     await this.refreshMarket();
-    if (this.d.exec.kind !== "sim") await this.reconcile();
+    if (BEES.some((id) => this.execFor(id).kind !== "sim")) await this.reconcile();
 
     this.d.bus.emit("status", { event: "engine_start", mode: cfg.mode, tickMs: cfg.tickMs });
-    this.d.alerts.send(`engine started (MODE=${cfg.mode})`);
+    this.d.alerts.send(`engine started (MODE=${cfg.mode}, slots ${BEES.map((id) => `${id}:${cfg.slots[id].mode}`).join(" ")})`);
 
     this.loop(() => this.tick(), cfg.tickMs);
     this.loop(() => this.refreshMarket(), cfg.dataRefreshMs);
@@ -389,7 +418,7 @@ export class Engine {
       await this.d.feed.refresh(this.now());
       this.rankBoozyHourly();
       this.recordScout(this.now());
-      if (this.d.exec.kind === "okx") await this.pollFunding();
+      if (BEES.some((id) => this.execFor(id).kind === "okx")) await this.pollFunding();
     } catch (err) {
       log.warn("market refresh failed", { err: safeError(err) });
     } finally {
@@ -440,7 +469,7 @@ export class Engine {
       for (const id of BEES) this.markBee(id, now);
       for (const id of BEES) this.sampleLiqProxy(id);
       if (this.d.feed.lastRefreshAt === 0) return; // no market data yet
-      if (this.d.exec.kind === "sim") this.simulateFunding(now);
+      if (BEES.some((id) => this.execFor(id).kind === "sim")) this.simulateFunding(now);
 
       if (this.closedAt === null && this.d.closeRequested?.()) this.beginClose(now);
       if (this.closedAt === null && this.d.takeResumeRequest?.()) await this.resumeLast(now);
@@ -456,7 +485,7 @@ export class Engine {
         }
       }
       this.d.bus.emit("equity", { bees: BEES.map((id) => this.publicBee(id)) }, now);
-      if (this.d.exec.kind !== "sim" && now - this.lastReconAt >= RECON_MS) await this.reconcile();
+      if (BEES.some((id) => this.execFor(id).kind !== "sim") && now - this.lastReconAt >= RECON_MS) await this.reconcile();
       this.checkJevOutage(now);
     } finally {
       this.ticking = false;
@@ -759,7 +788,7 @@ private filterVenueMenu(menu: Menu, coins: string[]): Menu {
       brain,
       proposal,
       jev: jevStatus,
-      sizeMult: this.sizeMult(now),
+      sizeMult: this.sizeMult(id, now),
       dataAgeMs,
       maxDataAgeMs: 3 * cfg.dataRefreshMs + 30_000,
     });
@@ -928,7 +957,7 @@ private filterVenueMenu(menu: Menu, coins: string[]): Menu {
       brain: this.brain(id),
       proposal: null,
       jev: "no_options",
-      sizeMult: this.sizeMult(now),
+      sizeMult: this.sizeMult(id, now),
       dataAgeMs: now - this.d.feed.lastRefreshAt,
       maxDataAgeMs: 3 * this.d.cfg.dataRefreshMs + 30_000,
     });
@@ -1147,7 +1176,8 @@ private filterVenueMenu(menu: Menu, coins: string[]): Menu {
 
   /** Record the order, send it, apply the fill. Returns true when it filled. */
   private async order(id: BeeId, decisionId: number, instId: string, side: "buy" | "sell", contracts: number, reduceOnly: boolean, purpose: string): Promise<boolean> {
-    const { db, bus, exec } = this.d;
+    const { db, bus } = this.d;
+    const exec = this.execFor(id);
     const now = this.now();
     const inst = this.d.feed.view().instruments.get(instId);
     if (!inst) return false;
@@ -1218,6 +1248,7 @@ private filterVenueMenu(menu: Menu, coins: string[]): Menu {
     this.lastFundingSlot = slot;
     const view = this.d.feed.view();
     for (const id of BEES) {
+      if (this.execFor(id).kind !== "sim") continue;
       const bee = this.bees[id];
       const p = bee.position;
       const s = p ? view.stats.get(p.instId) : undefined;
@@ -1235,7 +1266,8 @@ private filterVenueMenu(menu: Menu, coins: string[]): Menu {
   private async pollFunding() {
     const since = Number(this.d.db.getMeta("funding_since") ?? 0);
     for (const id of BEES) {
-      const bills = await this.d.exec.fundingBills(id);
+      if (this.execFor(id).kind !== "okx") continue;
+      const bills = await this.execFor(id).fundingBills(id);
       for (const b of bills ?? []) {
         if (b.ts < since) continue;
         if (this.d.db.insertFunding(id, b.ts, b.instId, b.amountUsd, b.billId)) {
@@ -1254,9 +1286,9 @@ private filterVenueMenu(menu: Menu, coins: string[]): Menu {
     const diffs: string[] = [];
     for (const id of BEES) {
       const bee = this.bees[id];
-      const ex = await this.d.exec.positions(id);
+      const ex = await this.execFor(id).positions(id);
       if (ex === null) {
-        diffs.push(`${this.d.cfg.slots[id].name}: could not read ${this.d.exec.venue} positions`);
+        diffs.push(`${this.d.cfg.slots[id].name}: could not read ${this.execFor(id).venue} positions`);
         continue;
       }
       const theirs = ex[0];
@@ -1265,20 +1297,20 @@ private filterVenueMenu(menu: Menu, coins: string[]): Menu {
       const theirSigned = theirs?.pos ?? 0;
       const sameInst = (ours?.instId ?? null) === (theirs?.instId ?? null);
       let ok = ex.length <= 1 && sameInst && Math.abs(oursSigned - theirSigned) < 1e-9;
-      let detail = ok ? "match" : `ours ${ours ? `${ours.side} ${ours.contracts} ${ours.coin}` : "flat"} vs ${this.d.exec.venue} ${theirs ? `${theirs.pos} ${theirs.instId.split("-")[0]}` : "flat"}`;
+      let detail = ok ? "match" : `ours ${ours ? `${ours.side} ${ours.contracts} ${ours.coin}` : "flat"} vs ${this.execFor(id).venue} ${theirs ? `${theirs.pos} ${theirs.instId.split("-")[0]}` : "flat"}`;
 
       // Fees to the cent on our recent filled orders.
       const rows = this.d.db.raw
         .prepare(`SELECT o.ord_id AS ordId, o.inst_id AS instId, f.fee_usd AS fee FROM orders o JOIN fills f ON f.order_id = o.id WHERE o.bee = ? AND o.ord_id IS NOT NULL ORDER BY o.id DESC LIMIT 50`)
         .all(id) as Array<{ ordId: string; instId: string; fee: number }>;
       if (rows.length) {
-        const theirFees = await this.d.exec.feesFor(id, [...new Set(rows.map((r) => r.instId))], new Set(rows.map((r) => r.ordId)));
+        const theirFees = await this.execFor(id).feesFor(id, [...new Set(rows.map((r) => r.instId))], new Set(rows.map((r) => r.ordId)));
         if (theirFees) {
           const ourSum = rows.filter((r) => theirFees.has(r.ordId)).reduce((a, r) => a + r.fee, 0);
           const theirSum = [...theirFees.values()].reduce((a, b) => a + b, 0);
           if (Math.abs(ourSum - theirSum) >= 0.005) {
             ok = false;
-            detail += `; fees ours $${ourSum.toFixed(2)} vs ${this.d.exec.venue} $${theirSum.toFixed(2)}`;
+            detail += `; fees ours $${ourSum.toFixed(2)} vs ${this.execFor(id).venue} $${theirSum.toFixed(2)}`;
           }
         }
       }
@@ -1320,7 +1352,7 @@ private filterVenueMenu(menu: Menu, coins: string[]): Menu {
     }
     const ok = diffs.length === 0;
     const was = this.recon.ok;
-    this.recon = { ok, detail: ok ? `books match ${this.d.exec.venue}` : diffs.join(" | "), ts: now };
+    this.recon = { ok, detail: ok ? `books match ${BEES.map((b) => `${b}:${this.execFor(b).venue}`).join(" ")}` : diffs.join(" | "), ts: now };
     this.d.bus.emit("recon", { ok, detail: this.recon.detail }, now);
     if (!ok && was !== false) this.d.alerts.send(`reconciliation mismatch: ${this.recon.detail}`);
   }
@@ -1371,9 +1403,10 @@ private filterVenueMenu(menu: Menu, coins: string[]): Menu {
     }
   }
 
-  private sizeMult(now: number): number {
+  private sizeMult(id: BeeId, now: number): number {
     const { cfg } = this.d;
-    if (cfg.mode !== "live" || this.liveStartedAt === null) return 1;
+    // The live ramp throttles live slots only; sim/demo/paper slots always run full size.
+    if (cfg.slots[id].mode !== "live" || this.liveStartedAt === null) return 1;
     return now - this.liveStartedAt < cfg.risk.liveRampHours * 3_600_000 ? cfg.risk.liveSizeMultiplier : 1;
   }
 
@@ -1385,7 +1418,9 @@ private filterVenueMenu(menu: Menu, coins: string[]): Menu {
     const p = b.position;
     const inst = p ? view.instruments.get(p.instId) : undefined;
     const mid = p ? view.tickers.get(p.instId)?.mid : undefined;
-    const start = this.d.cfg.risk.startEquityUsd;
+    // Display baseline follows the slot's book size (paper books start smaller).
+    // Live slots trade real balances; the baseline equals the configured book size.
+    const start = this.startEquity(id);
     const knobs = this.knobs(id);
     const style = this.d.cfg.slots[id].style;
     const triggers = this.brain(id).triggers;

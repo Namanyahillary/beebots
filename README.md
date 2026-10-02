@@ -190,9 +190,14 @@ keeps 7 days. That copy lives on the same server, so take an off-server copy you
 beebots can trade OKX demo accounts or real money, but only if you set it up by hand. It is **not** part of Setup, and
 there is no button for it.
 
-- Real money needs **all** of: `DRY_RUN=false`, `MODE=live`, three OKX **EEA** sub-account API keys
-  (`BEE1_OKX_API_KEY` etc., Read + Trade only, **never Withdraw or Transfer**, IP-bound to your server), and
+- Real money needs **all** of: `DRY_RUN=false`, a live mode for every slot that should trade
+  (`MODE=live`, or `BEE*_MODE=live` per slot), OKX **EEA** sub-account API keys for each live slot
+  (`BEE6_OKX_API_KEY` etc., Read + Trade only, **never Withdraw or Transfer**, IP-bound to your server), and
   `LIVE_ACK=I-ACCEPT-REAL-MONEY-RISK`. With any one of them missing, the engine refuses to start.
+- **One bot live first (recommended):** leave `MODE=dry` and set only that slot, e.g. `BEE6_MODE=live`
+  plus its live keys (`BEE6_OKX_API_KEY/SECRET/PASSPHRASE`) and `LIVE_ACK`. Only that slot touches the
+  exchange; the rest keep paper trading. Its column carries a red ● LIVE badge so there is never any
+  doubt which bot has real money. Same ack phrase, same ramp, same guards — scoped to one slot.
 - The first hours of live trading run at reduced size (`LIVE_SIZE_MULTIPLIER`, `LIVE_RAMP_HOURS`).
 - The bot can never withdraw. Moving money off the exchange is always done by you, by hand.
 - Try `MODE=demo` first, with OKX **demo** keys (`BEE1_OKX_DEMO_API_KEY` etc.).

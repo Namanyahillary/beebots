@@ -435,6 +435,8 @@ export function BeeColumn({ name, bee, curve, baseline, rank, gap, flash, fills,
           </div>
           <div className="engine-badges">
             <span className="engine-badge">{styleLabel}</span>
+            {meta.mode === "live" && <span className="live-badge" title="This slot trades real money">● LIVE</span>}
+            {meta.mode !== "live" && meta.mode !== "dry" && <span className="venue-badge">{meta.mode}</span>}
             {(bee?.triggers ?? (styleId === "bizzy" ? ["Williams breakout", "Stinger"] : []))
               .filter((t) => {
                 // Skip the trigger that merely restates the engine family

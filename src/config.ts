@@ -53,8 +53,9 @@ const perStyle = (prefix: string, d: { trades: number; fee: number; spread: numb
   [`${prefix}_MAX_FLAT_MINUTES`]: num(d.maxFlat),
 });
 // Per-bee OKX keys (demo or live only): BEE1_OKX_API_KEY, BEE1_OKX_DEMO_API_KEY, ...
+// BEE*_MODE overrides the venue for one slot (dry/demo/live/paper, default = MODE).
 const perSlot = (prefix: string) => ({
-  [`${prefix}_OKX_API_KEY`]: opt,
+  [`${prefix}_MODE`]: opt,  [`${prefix}_OKX_API_KEY`]: opt,
   [`${prefix}_OKX_API_SECRET`]: opt,
   [`${prefix}_OKX_API_PASSPHRASE`]: opt,
   [`${prefix}_OKX_DEMO_API_KEY`]: opt,
@@ -186,6 +187,8 @@ export interface SlotProfile {
   style: StyleId;
   name: string;
   tagline: string;
+  /** Trading venue for this slot (BEE*_MODE overrides the global MODE; defaults to it). Mixed modes are the point: one bot can go live while the pack stays dry. */
+  mode: Mode;
   /** A portrait generated on Setup lives in the data volume. */
   customImage: boolean;
   /** The owner's rules (fed to Jev) and coin restriction, from Setup. Empty for the original three. */
@@ -266,9 +269,18 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, settings: Setti
   }
   const missing: string[] = [];
   if (!jevKey) missing.push(backend === "openrouter" ? "OPENROUTER_API_KEY" : "TYPESAFE_API_KEY");
-  if (mode === "live" && e.LIVE_ACK !== LIVE_ACK_PHRASE) {
-    throw new ConfigError(`MODE=live moves real money. Set LIVE_ACK=${LIVE_ACK_PHRASE} to confirm you accept the risk, or go back to DRY_RUN=true.`);
-  }
+
+  // Per-slot venue override: BEE1_MODE=live (etc.) defaults to the global MODE.
+  // No slot is ever live by default — going live is always an explicit line.
+  const slotMode = (id: BeeId): Mode => {
+    const raw = e[`${id.toUpperCase()}_MODE`] as string | undefined;
+    if (raw === undefined || raw.trim() === "") return mode;
+    const m = raw.trim().toLowerCase();
+    if (m !== "dry" && m !== "demo" && m !== "live" && m !== "paper") {
+      throw new ConfigError(`${id.toUpperCase()}_MODE must be one of dry, demo, live, paper (got ${raw.trim()}).`);
+    }
+    return m;
+  };
 
   if (e.MAX_LEVERAGE > 2 || e.MAX_LEVERAGE <= 0) throw new ConfigError("MAX_LEVERAGE must be in (0, 2]. Hard rule 3.");
   if (e.MAX_FLAT_MINUTES < 0) throw new ConfigError("MAX_FLAT_MINUTES must be >= 0");
@@ -279,26 +291,33 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, settings: Setti
     const style = b?.style ?? DEFAULT_SLOTS[id];
     // Extra built-in slots (bee5) hunt under their own name, not their style's.
     const ident = SLOT_IDENTITY[id];
-    slots[id] = b
+    const base = b
       ? { style, name: b.name, tagline: b.tagline, customImage: b.image, rules: b.rules, coins: b.coins, fromSetup: true }
       : { style, name: ident?.name ?? STYLE_INFO[style].name, tagline: ident?.tagline ?? STYLE_INFO[style].tagline, customImage: false, rules: "", coins: [], fromSetup: false };
+    slots[id] = { ...base, mode: slotMode(id) };
   });
 
+  // Any live slot moves real money: the ack phrase plus an explicit per-slot line.
+  if (BEES.some((id) => slots[id].mode === "live") && e.LIVE_ACK !== LIVE_ACK_PHRASE) {
+    const who = BEES.filter((id) => slots[id].mode === "live").join(", ");
+    throw new ConfigError(`${who} ${who.includes(",") ? "go" : "goes"} live with real money. Set LIVE_ACK=${LIVE_ACK_PHRASE} to confirm you accept the risk (plus the explicit per-slot MODE line, which you have).`);
+  }
+
+  // Credentials load per slot per ITS mode (a dry pack with one live bee needs
+  // live keys for that bee only — never the whole set).
   const creds: Partial<Record<BeeId, OkxCreds>> = {};
   const alpCreds: Partial<Record<BeeId, AlpacaCreds>> = {};
-  if (mode === "paper") {
-    for (const bee of BEES) {
-      const p = bee.toUpperCase();
+  for (const bee of BEES) {
+    const m = slots[bee].mode;
+    const p = bee.toUpperCase();
+    if (m === "paper") {
       const k = e[`${p}_ALPACA_API_KEY`] as string | undefined;
       const s = e[`${p}_ALPACA_API_SECRET`] as string | undefined;
       if (!k) missing.push(`${p}_ALPACA_API_KEY`);
       if (!s) missing.push(`${p}_ALPACA_API_SECRET`);
       if (k && s) alpCreds[bee] = { apiKey: k, secretKey: s };
-    }
-  } else if (mode !== "dry") {
-    const infix = mode === "demo" ? "OKX_DEMO_API" : "OKX_API";
-    for (const bee of BEES) {
-      const p = bee.toUpperCase();
+    } else if (m === "demo" || m === "live") {
+      const infix = m === "demo" ? "OKX_DEMO_API" : "OKX_API";
       const k = e[`${p}_${infix}_KEY`] as string | undefined;
       const s = e[`${p}_${infix}_SECRET`] as string | undefined;
       const ph = e[`${p}_${infix}_PASSPHRASE`] as string | undefined;

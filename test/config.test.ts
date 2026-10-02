@@ -35,8 +35,7 @@ describe("config", () => {
     expect(cfg.creds.bee3?.apiKey).toBe("BEE3-KEY");
   });
 
-  it("live needs the written risk acknowledgement, and demo/dry do not", () => {
-    const env: Record<string, string> = { TYPESAFE_API_KEY: "k", DRY_RUN: "false", MODE: "live" };
+  it("live needs the written risk acknowledgement, and demo/dry do not", () => {    const env: Record<string, string> = { TYPESAFE_API_KEY: "k", DRY_RUN: "false", MODE: "live" };
     for (const b of ["BEE1", "BEE2", "BEE3", "BEE4", "BEE5", "BEE6", "BEE7"]) for (const f of ["KEY", "SECRET", "PASSPHRASE"]) env[`${b}_OKX_API_${f}`] = `${b}-${f}`;
     expect(() => loadConfig(env)).toThrow(/LIVE_ACK/);
     expect(() => loadConfig({ ...env, LIVE_ACK: "yes" })).toThrow(/LIVE_ACK/);
@@ -135,5 +134,31 @@ describe("paper mode (Alpaca)", () => {
   });
   it("needs no LIVE_ACK (paper is not real money)", () => {
     expect(loadConfig(keys).mode).toBe("paper");
+  });
+});
+
+describe("per-slot modes (one bot live first)", () => {
+  const liveKeys = (b: string) => ({ [`${b}_OKX_API_KEY`]: `${b}-k`, [`${b}_OKX_API_SECRET`]: `${b}-s`, [`${b}_OKX_API_PASSPHRASE`]: `${b}-p` });
+  it("a single live slot needs live keys for that slot only, plus the ack", () => {
+    const base = { TYPESAFE_API_KEY: "k", DRY_RUN: "false", BEE6_MODE: "live", ...liveKeys("BEE6") };
+    expect(() => loadConfig(base)).toThrow(/LIVE_ACK/);
+    const c = loadConfig({ ...base, LIVE_ACK: LIVE_ACK_PHRASE });
+    expect(c.slots.bee6.mode).toBe("live");
+    expect(c.slots.bee1.mode).toBe("dry");
+    expect(c.creds.bee6?.apiKey).toBe("BEE6-k");
+    expect(c.creds.bee1).toBeUndefined();
+  });
+  it("rejects an unknown per-slot mode instead of silently drying it", () => {
+    expect(() => loadConfig({ TYPESAFE_API_KEY: "k", BEE2_MODE: "yolo" })).toThrow(/BEE2_MODE must be one of/);
+  });
+  it("paper slots start books at paper size", () => {
+    const keys: Record<string, string> = { TYPESAFE_API_KEY: "k", DRY_RUN: "false", MODE: "paper" };
+    for (const b of ["BEE1", "BEE2", "BEE3", "BEE4", "BEE5", "BEE6", "BEE7"]) {
+      keys[`${b}_ALPACA_API_KEY`] = `${b}-key`;
+      keys[`${b}_ALPACA_API_SECRET`] = `${b}-secret`;
+    }
+    const c = loadConfig(keys);
+    expect(c.slots.bee6.mode).toBe("paper");
+    expect(c.risk.startEquityUsd).toBe(100);
   });
 });

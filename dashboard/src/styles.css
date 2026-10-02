@@ -2085,6 +2085,29 @@ textarea.setup-input {
 .trigger-badge {
   border-style: dashed;
 }
+/* Per-slot venue: red LIVE chip (real money), dim chip for demo/paper. Dry shows nothing. */
+.live-badge {
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  padding: 0.15rem 0.55rem;
+  border-radius: 999px;
+  border: 1px solid var(--critical-text);
+  color: var(--critical-text);
+  white-space: nowrap;
+  animation: blink 2s infinite;
+}
+.venue-badge {
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 0.15rem 0.55rem;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  color: var(--muted);
+  white-space: nowrap;
+}
 /* Board position filter (All / Flat / Open): full-width toolbar above the grid. */
 .toolbar {
   display: flex;

@@ -173,6 +173,8 @@ export interface BeeMeta {
   short: string;
   tagline: string;
   styleLabel: string;
+  /** Venue for this slot (dry/demo/live/paper) — drives the LIVE badge. */
+  mode: string;
   /** The owner's rules for this bee (Setup), "" for the original three. */
   rules: string;
   coins: string[];
@@ -183,17 +185,17 @@ export interface BeeMeta {
 
 /** Colours belong to the slot, so two bees on the same style still look different. Filled in from /profile at load. */
 export const BEE_META: Record<BeeName, BeeMeta> = {
-  bee1: { short: "Grim", tagline: "the grinder", styleLabel: "Breakout", rules: "", coins: [], img: "/bees/grim.jpg", color: "var(--bizzy)", glow: "var(--bizzy-glow)" },
-  bee2: { short: "Silver", tagline: "the calculated one", styleLabel: "Trend", rules: "", coins: [], img: "/bees/silver.jpg", color: "var(--breezy)", glow: "var(--breezy-glow)" },
-  bee3: { short: "Blaze", tagline: "the degen", styleLabel: "Momentum", rules: "", coins: [], img: "/bees/blaze.jpg", color: "var(--boozy)", glow: "var(--boozy-glow)" },
+  bee1: { mode: "dry", short: "Grim", tagline: "the grinder", styleLabel: "Breakout", rules: "", coins: [], img: "/bees/grim.jpg", color: "var(--bizzy)", glow: "var(--bizzy-glow)" },
+  bee2: { mode: "dry", short: "Silver", tagline: "the calculated one", styleLabel: "Trend", rules: "", coins: [], img: "/bees/silver.jpg", color: "var(--breezy)", glow: "var(--breezy-glow)" },
+  bee3: { mode: "dry", short: "Blaze", tagline: "the degen", styleLabel: "Momentum", rules: "", coins: [], img: "/bees/blaze.jpg", color: "var(--boozy)", glow: "var(--boozy-glow)" },
   /** Placeholder mark until Ash is painted (per-wolf initial, replaced by the portrait). */
-  bee4: { short: "Ash", tagline: "buys the dip", styleLabel: "Pullback", rules: "", coins: [], img: wolfMark("A", "#6366f1"), color: "var(--pullback)", glow: "var(--pullback-glow)" },
+  bee4: { mode: "dry", short: "Ash", tagline: "buys the dip", styleLabel: "Pullback", rules: "", coins: [], img: wolfMark("A", "#6366f1"), color: "var(--pullback)", glow: "var(--pullback-glow)" },
   /** Zip shares Dash's playbook from the slot beside him — same placeholder deal. */
-  bee5: { short: "Zip", tagline: "the restless one", styleLabel: "Scalp", rules: "", coins: [], img: wolfMark("Z", "#22d3ee"), color: "var(--zippy)", glow: "var(--zippy-glow)" },
+  bee5: { mode: "dry", short: "Zip", tagline: "the restless one", styleLabel: "Scalp", rules: "", coins: [], img: wolfMark("Z", "#22d3ee"), color: "var(--zippy)", glow: "var(--zippy-glow)" },
   /** Rook fades crowded positioning — placeholder until painted. */
-  bee6: { short: "Rook", tagline: "the contrarian", styleLabel: "Fade", rules: "", coins: [], img: wolfMark("R", "#ec4899"), color: "var(--fade)", glow: "var(--fade-glow)" },
+  bee6: { mode: "dry", short: "Rook", tagline: "the contrarian", styleLabel: "Fade", rules: "", coins: [], img: wolfMark("R", "#ec4899"), color: "var(--fade)", glow: "var(--fade-glow)" },
   /** Echo reverts price stretches — placeholder until painted. */
-  bee7: { short: "Echo", tagline: "the snap-back", styleLabel: "Revert", rules: "", coins: [], img: wolfMark("E", "#a3e635"), color: "var(--bounce)", glow: "var(--bounce-glow)" },
+  bee7: { mode: "dry", short: "Echo", tagline: "the snap-back", styleLabel: "Revert", rules: "", coins: [], img: wolfMark("E", "#a3e635"), color: "var(--bounce)", glow: "var(--bounce-glow)" },
 };
 
 export interface Profile {
@@ -201,7 +203,7 @@ export interface Profile {
   mode: "dry" | "demo" | "live";
   links: { sponsor: string; code: string } | null;
   /** img null: a Setup-made bee without its portrait (the dashboard shows the placeholder mark). */
-  bees: Array<{ id: BeeName; name: string; tagline: string; style: string; styleLabel: string; rules?: string; coins?: string[]; img: string | null }>;
+  bees: Array<{ id: BeeName; name: string; tagline: string; style: string; styleLabel: string; mode?: string; rules?: string; coins?: string[]; img: string | null }>;
 }
 
 export const PROFILE: { links: Profile["links"] } = { links: null };
@@ -214,6 +216,7 @@ export function applyProfile(p: Profile): void {
     m.short = b.name;
     m.tagline = b.tagline;
     m.styleLabel = b.styleLabel;
+    if (b.mode) m.mode = b.mode;
     m.rules = b.rules ?? "";
     m.coins = b.coins ?? [];
     m.img = b.img ?? m.img;

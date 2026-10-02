@@ -2,7 +2,7 @@ import { existsSync, unlinkSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { Alerts } from "./alerts.js";
 import { BREEZY_COINS } from "./bees/breezy.js";
-import { BEES, ConfigError, loadConfig, STYLES, type Config } from "./config.js";
+import { BEES, ConfigError, loadConfig, STYLES, type BeeId, type Config } from "./config.js";
 import { Db } from "./db.js";
 import { Engine } from "./engine.js";
 import { EventBus } from "./events.js";
@@ -50,6 +50,7 @@ function profile(cfg: Config | null) {  return {
             name: s.name,
             tagline: s.tagline,
             style: s.style,
+            mode: s.mode,
             styleLabel: STYLE_INFO[s.style].label,
             rules: s.rules,
             coins: s.coins,
@@ -127,12 +128,16 @@ async function main() {
     held,
   );
 
-  const exec: Executor =
-    cfg.mode === "dry"
-      ? new SimExecutor(() => feed.view(), cfg.risk.takerFeeRate)
-      : cfg.mode === "paper"
-        ? new AlpacaExecutor(cfg.paper.baseUrl, cfg.alpCreds, (id) => feed.view().instruments.get(id), () => feed.view().instruments)
-        : new OkxExecutor(cli, cfg.creds, demo, (id) => feed.view().instruments.get(id), cfg.risk.maxLeverage);
+  const execs = {} as Record<BeeId, Executor>;
+  // One shared sim (stateless per call). Alpaca + OKX executors already route per-bee keys internally.
+  const simExec = new SimExecutor(() => feed.view(), cfg.risk.takerFeeRate);
+  const alpacaExec = new AlpacaExecutor(cfg.paper.baseUrl, cfg.alpCreds, (id) => feed.view().instruments.get(id), () => feed.view().instruments);
+  const okxDemoExec = new OkxExecutor(cli, cfg.creds, true, (id) => feed.view().instruments.get(id), cfg.risk.maxLeverage);
+  const okxLiveExec = new OkxExecutor(cli, cfg.creds, false, (id) => feed.view().instruments.get(id), cfg.risk.maxLeverage);
+  for (const id of BEES) {
+    const m = cfg.slots[id].mode;
+    execs[id] = m === "dry" ? simExec : m === "paper" ? alpacaExec : m === "demo" ? okxDemoExec : okxLiveExec;
+  }
 
   const startOfDay = Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), new Date().getUTCDate());
   const jevOpts = { ...cfg.jev, spentTodayUsd: db.jevSpendSince(startOfDay) };
@@ -152,7 +157,7 @@ async function main() {
     unlinkSync(resumeFlag);
     return true;
   };
-  engine = new Engine({ cfg, db, feed, jev, exec, bus, alerts, closeRequested: () => existsSync(closeFlag), takeResumeRequest });
+  engine = new Engine({ cfg, db, feed, jev, execs, bus, alerts, closeRequested: () => existsSync(closeFlag), takeResumeRequest });
   await engine.start();
 
   // The owner password (picked on Setup) gates joining and leaving the Hive from the dashboard. Installs without one
