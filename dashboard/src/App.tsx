@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { BeeColumn, money } from "./BeeColumn";
+import { DayPnl } from "./DayPnl";
 import { Fills } from "./Fills";
 import { Header } from "./Header";
 import { Help } from "./Help";
@@ -49,6 +50,7 @@ export function App() {
   const [, force] = useState(0);
   const [boardCollapsed, boardCollapseBtn] = useCollapsed("board");
   const [blockedCollapsed, blockedCollapseBtn] = useCollapsed("blocked");
+  const [showDayPnl, setShowDayPnl] = useState(false);
 
   // Re-render every second so "ago" / flash windows expire even when the stream is quiet.
   useEffect(() => {
@@ -177,6 +179,9 @@ export function App() {
                 </Help>
               </span>
               <span className="dim">equity</span>
+                <button type="button" className="scout-toggle-btn" onClick={() => setShowDayPnl(true)} title="Pack P&L per day">
+                  daily
+                </button>
               {boardCollapseBtn}
             </div>
             {!boardCollapsed && (
@@ -222,6 +227,7 @@ export function App() {
         </aside>
       </main>
       <Toasts toasts={feed.toasts} />
+      {showDayPnl && <DayPnl curves={feed.curves} onClose={() => setShowDayPnl(false)} />}
     </div>
   );
 }

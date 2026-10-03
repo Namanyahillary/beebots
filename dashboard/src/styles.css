@@ -1361,6 +1361,60 @@ body,
   font-size: 0.9rem;
 }
 
+/* ---------- pack P&L by day (click "daily" in the leaderboard head) ---------- */
+.daypnl-sub {
+  margin: 0 0 1rem;
+}
+.daypnl-bars {
+  display: flex;
+  align-items: stretch;
+  gap: 0.4rem;
+  overflow-x: auto;
+  padding-bottom: 0.25rem;
+}
+.daypnl-col {
+  flex: 1 0 3.4rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3rem;
+  min-width: 0;
+}
+.daypnl-val {
+  font-size: 0.85rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.daypnl-track {
+  height: 7rem;
+  width: 100%;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  background: var(--card-2);
+  border-radius: 0.4rem;
+  padding: 0.25rem;
+}
+.daypnl-bar {
+  width: 70%;
+  border-radius: 0.25rem;
+  min-height: 3px;
+}
+.daypnl-bar.up {
+  background: var(--good-text);
+}
+.daypnl-bar.down {
+  background: var(--critical-text);
+}
+.daypnl-day {
+  font-size: 0.8rem;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.daypnl-today {
+  color: var(--text-2);
+}
+
 /* ---------- trade modal ---------- */
 .trade-grid {
   display: grid;
