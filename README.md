@@ -240,6 +240,18 @@ cd dashboard && pnpm install && pnpm dev    # http://127.0.0.1:5173, proxied to 
 
 Rule of the repo: `typecheck && lint && test` green before every commit, no exceptions.
 
+### Research sweeps (Daytona burst compute)
+
+Parameter scans and replay analyses run in disposable Daytona sandboxes — the trading machine stays
+clean and sweeps parallelize. Needs `DAYTONA_API_KEY` in `.env` (gitignored, engine ignores it).
+
+```sh
+scripts/daytona-sweep.sh <name> <local-script.py> [args...]   # run, print table, destroy (always)
+```
+
+The script uploads through the exec channel itself (no repo clone, no credentials leave); the sandbox is
+destroyed even on failure. Verify no residue via the sandbox list endpoint afterwards.
+
 ### The engine on this server (no Docker here)
 
 This install runs the engine directly under `tsx` (not Docker). Restart it after every engine change:
