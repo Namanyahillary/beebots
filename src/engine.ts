@@ -313,6 +313,9 @@ export class Engine {
   /** Staged-entry ghost plans (bizzy only, measurement — never executes). Lost on restart by design. */
   private stagedPlans = {} as Partial<Record<BeeId, StagedPlan>>;
   private liveStartedAt: number | null = null;
+  /** First recorded decision/fill per bee (birth). Mins over a growing table never
+      change once set, so one load covers the process lifetime. Lost on restart by design. */
+  private bornCache: Record<string, { decisions: number | null; fills: number | null }> | null = null;
   private lastPulseAt: Partial<Record<BeeId, number>> = {};
   private lastChipUsd: Partial<Record<BeeId, number>> = {};
   startedAt: number;
@@ -1425,9 +1428,13 @@ private filterVenueMenu(menu: Menu, coins: string[]): Menu {
     const style = this.d.cfg.slots[id].style;
     const triggers = this.brain(id).triggers;
     const r2 = (x: number) => Number(x.toFixed(2));
+    if (!this.bornCache) this.bornCache = this.d.db.firstActivity();
+    const born = this.bornCache[id] ?? { decisions: null, fills: null };
     return {
       bee: id,
       style,
+      bornTs: born.decisions,
+      firstFillTs: born.fills,
       equityUsd: r2(b.equityUsd),
       pnlUsd: r2(b.equityUsd - start),
       pnlPct: r2(((b.equityUsd - start) / start) * 100),

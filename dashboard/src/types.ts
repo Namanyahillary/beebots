@@ -22,6 +22,10 @@ export interface PublicBee {
   bee: BeeName;
   /** Slot's engine style ("bizzy"/"breezy"/"boozy"/"scalpy"); drives the engine badge. */
   style: string;
+  /** First recorded decision ts (birth). Null on a fresh book with no decisions yet. */
+  bornTs: number | null;
+  /** First recorded fill ts. Null when the bee has never traded. */
+  firstFillTs: number | null;
   /** Entry triggers this brain can act on; present only when the brain declares any. */
   triggers?: string[];
   equityUsd: number;

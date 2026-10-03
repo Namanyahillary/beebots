@@ -526,6 +526,13 @@ body,
   border-color: var(--bee);
   color: var(--bee);
 }
+/* Alive line under the rank gap: dim, small, exact birth on hover. */
+.alive {
+  margin-top: 0.15rem;
+  font-size: 0.75rem;
+  color: var(--muted);
+  white-space: nowrap;
+}
 .empty-board {
   padding: 1rem 0.5rem;
 }

@@ -13,6 +13,16 @@ export const signed = (x: number, d = 2) => `${x >= 0 ? "+" : "−"}$${Math.abs(
 const px = (x: number | null | undefined) =>
   x === null || x === undefined ? "–" : x >= 1000 ? x.toLocaleString("en-US", { maximumFractionDigits: 1 }) : x >= 1 ? x.toFixed(3) : x.toPrecision(4);
 
+/** Compact age ("6d 4h") from a birth timestamp. Board re-renders every second, so Date.now() stays fresh. */
+const age = (ts: number) => {
+  const m = Math.max(0, Math.floor((Date.now() - ts) / 60000));
+  const d = Math.floor(m / 1440);
+  const h = Math.floor((m % 1440) / 60);
+  if (d > 0) return `${d}d ${h}h`;
+  if (h > 0) return `${h}h ${m % 60}m`;
+  return `${m}m`;
+};
+
 function Delta({ usd, pct }: { usd: number; pct?: number }) {
   const up = usd >= 0;
   return (
@@ -462,6 +472,14 @@ export function BeeColumn({ name, bee, curve, baseline, rank, gap, flash, fills,
         <div className="rank">
           <div className="rank-n">#{rank}</div>
           {gap !== null && <div className="rank-gap num">{gap === 0 ? "leading" : `${money(gap)} behind`}</div>}
+          {bee?.bornTs ? (
+            <div
+              className="alive num"
+              title={`watching since ${new Date(bee.bornTs).toLocaleString()}${bee.firstFillTs ? `; first fill ${new Date(bee.firstFillTs).toLocaleString()}` : "; no fills yet"}`}
+            >
+              alive {age(bee.bornTs)}
+            </div>
+          ) : null}
           <button
             type="button"
             className={`pin-btn${pinned ? " on" : ""}`}

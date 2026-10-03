@@ -68,6 +68,7 @@ CREATE TABLE IF NOT EXISTS fills (
   notional_usd REAL NOT NULL, fee_usd REAL NOT NULL, realised_usd REAL NOT NULL,
   entry_decision_id INTEGER
 );
+CREATE INDEX IF NOT EXISTS fills_bee_ts ON fills(bee, ts);
 CREATE TABLE IF NOT EXISTS funding (
   id INTEGER PRIMARY KEY, bee TEXT NOT NULL, ts INTEGER NOT NULL, inst_id TEXT,
   amount_usd REAL NOT NULL, bill_id TEXT UNIQUE
@@ -418,6 +419,18 @@ export class Db {
       eligible: parseScoutEligible(row.eligible),
       excluded: JSON.parse(row.excluded) as Array<{ instId: string; reasons: string[] }>,
     };
+  }
+
+  /** First recorded decision and fill per bee (birth = first decision). Nulls when a bee has no rows yet. */
+  firstActivity(): Record<string, { decisions: number | null; fills: number | null }> {
+    const out: Record<string, { decisions: number | null; fills: number | null }> = {};
+    for (const row of this.raw.prepare(`SELECT bee, MIN(ts) AS ts FROM decisions GROUP BY bee`).all() as Array<{ bee: string; ts: number }>) {
+      out[row.bee] = { decisions: row.ts, fills: null };
+    }
+    for (const row of this.raw.prepare(`SELECT bee, MIN(ts) AS ts FROM fills GROUP BY bee`).all() as Array<{ bee: string; ts: number }>) {
+      (out[row.bee] ??= { decisions: null, fills: null }).fills = row.ts;
+    }
+    return out;
   }
 
   /** Recent scout snapshots, newest first, at most `limit`. Powers GET /scout/history. */
