@@ -92,6 +92,23 @@ CREATE TABLE IF NOT EXISTS scout_snapshots (
 );
 CREATE INDEX IF NOT EXISTS scout_snapshots_ts ON scout_snapshots(ts);
 CREATE TABLE IF NOT EXISTS meta (k TEXT PRIMARY KEY, v TEXT NOT NULL);
+-- Silver exit shadow lab: one row per closed 4h bar while the live trade is open.
+CREATE TABLE IF NOT EXISTS trade_path (
+  id INTEGER PRIMARY KEY, bee TEXT NOT NULL, opened_ts INTEGER NOT NULL, bar_ts INTEGER NOT NULL,
+  x_r REAL NOT NULL, atr_ratio REAL, score INTEGER
+);
+CREATE INDEX IF NOT EXISTS trade_path_bee_opened ON trade_path(bee, opened_ts);
+-- One row per closed lab (all five shadow variants scored against the live exit).
+CREATE TABLE IF NOT EXISTS exit_lab (
+  id INTEGER PRIMARY KEY, bee TEXT NOT NULL, opened_ts INTEGER NOT NULL, closed_ts INTEGER NOT NULL,
+  entry_score INTEGER, r_usd REAL, r_atr REAL, r_atr_now REAL,
+  bars INTEGER NOT NULL, n_t INTEGER NOT NULL,
+  mfe_c REAL NOT NULL, mfe_h REAL NOT NULL, mae_c REAL NOT NULL,
+  t05 INTEGER NOT NULL, ret05 INTEGER NOT NULL,
+  live_net_r REAL NOT NULL, reason TEXT NOT NULL, rt INTEGER NOT NULL,
+  a REAL NOT NULL, b REAL NOT NULL, c REAL NOT NULL, d REAL NOT NULL, e REAL NOT NULL,
+  valid INTEGER NOT NULL
+);
 `;
 
 export interface DecisionRow {
@@ -421,8 +438,7 @@ export class Db {
     };
   }
 
-  /** First recorded decision and fill per bee (birth = first decision). Nulls when a bee has no rows yet. */
-  firstActivity(): Record<string, { decisions: number | null; fills: number | null }> {
+  /** First recorded decision and fill per bee (birth = first decision). Nulls when a bee has no rows yet. */  firstActivity(): Record<string, { decisions: number | null; fills: number | null }> {
     const out: Record<string, { decisions: number | null; fills: number | null }> = {};
     for (const row of this.raw.prepare(`SELECT bee, MIN(ts) AS ts FROM decisions GROUP BY bee`).all() as Array<{ bee: string; ts: number }>) {
       out[row.bee] = { decisions: row.ts, fills: null };
@@ -431,6 +447,50 @@ export class Db {
       (out[row.bee] ??= { decisions: null, fills: null }).fills = row.ts;
     }
     return out;
+  }
+
+  /** One closed-bar step of a Silver exit-lab shadow run. */
+  saveTradePathRow(bee: string, openedTs: number, barTs: number, xR: number, atrRatio: number | null, score: number | null): void {
+    this.raw
+      .prepare(`INSERT INTO trade_path (bee, opened_ts, bar_ts, x_r, atr_ratio, score) VALUES (?,?,?,?,?,?)`)
+      .run(bee, openedTs, barTs, xR, atrRatio, score);
+  }
+
+  /** Latest filled reduce-only order purpose for a bee (the live exit reason). */
+  lastClosePurpose(bee: string): string | null {
+    const row = this.raw
+      .prepare(`SELECT purpose FROM orders WHERE bee = ? AND reduce_only = 1 AND state = 'filled' ORDER BY id DESC LIMIT 1`)
+      .get(bee) as { purpose: string } | undefined;
+    return row?.purpose ?? null;
+  }
+
+  /** Realised sum + last fill price for a bee since ts (scores one live trade at close). */
+  tradeSummary(bee: string, sinceTs: number): { realised: number; lastPx: number | null; lastTs: number | null } {
+    const row = this.raw
+      .prepare(`SELECT COALESCE(SUM(realised_usd), 0) AS realised, MAX(ts) AS last_ts FROM fills WHERE bee = ? AND ts >= ?`)
+      .get(bee, sinceTs) as { realised: number; last_ts: number | null };
+    const px =
+      row.last_ts === null
+        ? null
+        : (this.raw.prepare(`SELECT px FROM fills WHERE bee = ? AND ts = ? ORDER BY id DESC LIMIT 1`).get(bee, row.last_ts) as { px: number } | undefined)?.px ?? null;
+    return { realised: row.realised, lastPx: px, lastTs: row.last_ts };
+  }
+
+  /** Scored exit-lab result for one closed live trade. */
+  saveExitLab(r: {
+    bee: string; openedTs: number; closedTs: number; entryScore: number | null; rUsd: number | null; rAtr: number | null; rAtrNow: number | null;
+    bars: number; nT: number; mfeC: number; mfeH: number; maeC: number; t05: number; ret05: boolean;
+    liveNetR: number; reason: string; rt: boolean; a: number; b: number; c: number; d: number; e: number; valid: boolean;
+  }): void {
+    this.raw
+      .prepare(
+        `INSERT INTO exit_lab (bee, opened_ts, closed_ts, entry_score, r_usd, r_atr, r_atr_now,
+          bars, n_t, mfe_c, mfe_h, mae_c, t05, ret05, live_net_r, reason, rt, a, b, c, d, e, valid)
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+      )
+      .run(r.bee, r.openedTs, r.closedTs, r.entryScore, r.rUsd, r.rAtr, r.rAtrNow,
+        r.bars, r.nT, r.mfeC, r.mfeH, r.maeC, r.t05 ? 1 : 0, r.ret05 ? 1 : 0,
+        r.liveNetR, r.reason, r.rt ? 1 : 0, r.a, r.b, r.c, r.d, r.e, r.valid ? 1 : 0);
   }
 
   /** Recent scout snapshots, newest first, at most `limit`. Powers GET /scout/history. */

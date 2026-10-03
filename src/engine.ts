@@ -1,6 +1,8 @@
 import { customBrain } from "./bees/custom.js";
 import { BRAINS } from "./bees/index.js";
 import { breakevenStopPx as breakevenStopPxCommon, maxNotionalUsd, minutesSince, positionNotional, uplUsd } from "./bees/common.js";
+import { labBar, labClose, labOpen, type Lab } from "./exitlab.js";
+import { atr } from "./market/indicators.js";
 import { coinOf, type Action, type BeeBrain, type BeeContext, type BeeState, type IdleDetail, type Intent, type Menu, type Position, type Side } from "./bees/types.js";
 import { BEES, STYLES, type BeeId, type Config } from "./config.js";
 import type { Alerts } from "./alerts.js";
@@ -316,6 +318,10 @@ export class Engine {
   /** First recorded decision/fill per bee (birth). Mins over a growing table never
       change once set, so one load covers the process lifetime. Lost on restart by design. */
   private bornCache: Record<string, { decisions: number | null; fills: number | null }> | null = null;
+  /** Silver exit-lab shadow (bee2 only, measurement — never touches live exits).
+      Lost on restart by design; a resumed position re-opens and backfills its bars. */
+  private exitLab: { lab: Lab; instId: string; openedTs: number; lastBarTs: number; entryScore: number | null; riskUsd: number } | null = null;
+  private exitLabViewTs = 0;
   private lastPulseAt: Partial<Record<BeeId, number>> = {};
   private lastChipUsd: Partial<Record<BeeId, number>> = {};
   startedAt: number;
@@ -458,6 +464,88 @@ export class Engine {
 
   // ---------- the tick ----------
 
+  /**
+   * Silver exit-lab shadow (bee2 only). Opens a five-variant lab when the live
+   * trade opens (backfilling closed 4h bars after a restart), feeds each new
+   * closed 4h bar, and scores all variants when the live trade closes. Live
+   * exits are untouched; a close while the engine is down simply logs nothing.
+   */
+  private syncExitLab(now: number): void {
+    try {
+      const id = "bee2" as BeeId;
+      if (this.d.cfg.slots[id]?.style !== "breezy") {
+        this.exitLab = null;
+        return;
+      }
+      const p = this.bees[id]?.position ?? null;
+      if (!p) {
+        if (this.exitLab) this.scoreExitLab(id, now);
+        return;
+      }
+      const view = this.d.feed.view();
+      if (view.ts === 0) return; // no market data yet
+      const fresh = !this.exitLab || this.exitLab.instId !== p.instId || this.exitLab.openedTs !== p.openedAt;
+      if (!fresh && view.ts === this.exitLabViewTs) return;
+      this.exitLabViewTs = view.ts;
+      const stopPx = p.initialStopPx ?? p.stopPx;
+      if (stopPx == null) return; // no stop, no R: nothing to score
+      if (fresh) {
+        const t = view.stats.get(p.instId)?.trend;
+        const mid = view.tickers.get(p.instId)?.mid ?? p.entryPx;
+        const atrPx = t?.atr4hPct != null ? (mid * t.atr4hPct) / 100 : Math.abs(p.entryPx - stopPx) / 2;
+        this.exitLab = {
+          lab: labOpen(p.side === "long" ? 1 : -1, p.entryPx, stopPx, atrPx),
+          instId: p.instId,
+          openedTs: p.openedAt,
+          lastBarTs: 0,
+          entryScore: p.entryScore ?? null,
+          riskUsd: p.riskUsd,
+        };
+        log.info("exit lab open", { bee: id, coin: p.coin, side: p.side });
+      }
+      const L = this.exitLab!;
+      const all = view.bars4h.get(p.instId) ?? [];
+      const score = view.stats.get(p.instId)?.trend?.score ?? null;
+      for (const c of all) {
+        if (!c.confirmed || c.ts <= p.openedAt || c.ts <= L.lastBarTs) continue;
+        const a = atr(all.filter((b) => b.ts <= c.ts), 14);
+        const row = labBar(L.lab, { ts: c.ts, close: c.c, high: c.h, low: c.l, atr: a ?? L.lab.atr0, score });
+        this.d.db.saveTradePathRow(id, L.openedTs, row.ts, row.xR, row.atrRatio, row.score);
+        L.lastBarTs = c.ts;
+      }
+    } catch (err) {
+      log.warn("exit lab sync failed", { err: safeError(err) });
+    }
+  }
+
+  /** Score a finished lab against the live close and persist the verdict. */
+  private scoreExitLab(id: BeeId, now: number): void {
+    const L = this.exitLab;
+    this.exitLab = null;
+    if (!L) return;
+    try {
+      const sum = this.d.db.tradeSummary(id, L.openedTs);
+      const liveNetR = L.riskUsd > 0 ? sum.realised / L.riskUsd : 0;
+      const reason = this.d.db.lastClosePurpose(id) ?? "unknown";
+      const res = labClose(L.lab, sum.lastPx ?? L.lab.entry, liveNetR, reason);
+      // Engine validity check: shadow (a) must track the live trade. Void otherwise.
+      const valid = L.riskUsd > 0 && Math.abs(res.a - liveNetR) <= 0.1;
+      const t = this.d.feed.view().stats.get(L.instId)?.trend;
+      const mid = this.d.feed.view().tickers.get(L.instId)?.mid;
+      const rAtrNow = t?.atr4hPct != null && mid ? mid * t.atr4hPct / 100 / L.lab.atr0 : null;
+      this.d.db.saveExitLab({
+        bee: id, openedTs: L.openedTs, closedTs: sum.lastTs ?? now,
+        entryScore: L.entryScore, rUsd: L.riskUsd, rAtr: L.lab.R / L.lab.atr0, rAtrNow,
+        bars: res.bars, nT: res.nT, mfeC: res.mfeC, mfeH: res.mfeH, maeC: res.maeC,
+        t05: res.t05, ret05: res.ret05, liveNetR: res.liveNetR, reason: res.reason, rt: res.rt,
+        a: res.a, b: res.b, c: res.c, d: res.d, e: res.e, valid,
+      });
+      log.info("exit lab scored", { bee: id, bars: res.bars, rt: res.rt, a: res.a, e: res.e, liveNetR, reason, valid });
+    } catch (err) {
+      log.warn("exit lab score failed", { err: safeError(err) });
+    }
+  }
+
   async tick(): Promise<void> {
     if (this.ticking) return;
     this.ticking = true;
@@ -471,6 +559,7 @@ export class Engine {
       const now = this.now();
       for (const id of BEES) this.markBee(id, now);
       for (const id of BEES) this.sampleLiqProxy(id);
+      this.syncExitLab(now);
       if (this.d.feed.lastRefreshAt === 0) return; // no market data yet
       if (BEES.some((id) => this.execFor(id).kind === "sim")) this.simulateFunding(now);
 
@@ -1447,6 +1536,8 @@ private filterVenueMenu(menu: Menu, coins: string[]): Menu {
             markPx: mid ?? null,
             stopPx: p.stopPx,
             uplUsd: r2(b.uplUsd),
+            // Locked P&L: what the books show if the current stop is hit now. Display only.
+            lockedUsd: p.stopPx && inst ? r2(uplUsd(p, p.stopPx, inst.ctVal)) : null,
             minutesHeld: Math.round(minutesSince(p.openedAt, this.now())),
           }
         : null,

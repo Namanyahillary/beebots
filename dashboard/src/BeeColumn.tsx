@@ -515,6 +515,11 @@ export function BeeColumn({ name, bee, curve, baseline, rank, gap, flash, fills,
             <div className="pos-upl num">
               <Delta usd={p.uplUsd} />
               <span className="dim"> unrealised · {p.minutesHeld}m held</span>
+              {p.lockedUsd !== null && p.lockedUsd !== undefined && (
+                <span className="dim" title="What the books show if the current stop is hit now">
+                  {" "}· locked {signed(p.lockedUsd)}
+                </span>
+              )}
             </div>
             <div className="pos-px num dim">
               entry {px(p.entryPx)} → mark {px(p.markPx)} · stop {px(p.stopPx)}

@@ -39,6 +39,8 @@ export interface PublicBee {
     markPx: number | null;
     stopPx: number | null;
     uplUsd: number;
+    /** P&L if the current stop is hit now (display only: open profit is not banked). */
+    lockedUsd: number | null;
     minutesHeld: number;
   } | null;
   flatMinutes: number | null;

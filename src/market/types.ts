@@ -96,6 +96,8 @@ export interface MarketView {
   instruments: Map<string, Instrument>;
   tickers: Map<string, Ticker>;
   stats: Map<string, CoinStats>;
+  /** Last-seen 4h candles per trend coin, oldest first (Silver exit-lab shadows). */
+  bars4h: Map<string, Candle[]>;
   /** Gated crypto universe (boozy's pool), ranked by 24h volume. */
   gated: string[];
   /** Coins that passed volume but failed the spread gate (for "boozy wanted RAY" moments). */

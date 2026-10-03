@@ -74,6 +74,8 @@ export class MarketFeed {
   private spreadBlocked: string[] = [];
   private oiHistory = new Map<string, Array<[number, number]>>();
   private fundingHist = new Map<string, { at: number; rates: number[] }>();
+  /** Last-seen 4h candles per trend coin (exit-lab shadows replay on closed bars). */
+  private bars4h = new Map<string, Candle[]>();
   private instrumentsAt = 0;
   private newsAvailable = false;
   lastRefreshAt = 0;
@@ -92,6 +94,7 @@ export class MarketFeed {
       instruments: this.instruments,
       tickers: this.tickers,
       stats: this.stats,
+      bars4h: this.bars4h,
       gated: this.gated,
       spreadBlocked: this.spreadBlocked,
       newsAvailable: this.newsAvailable,
@@ -165,7 +168,10 @@ export class MarketFeed {
           }
           s.oiUsd = oi.get(id) ?? null;
           s.oiChg1hPct = this.oiChange1h(id, now);
-          if (c4h) s.trend = trendStats(c4h);
+          if (c4h) {
+            s.trend = trendStats(c4h);
+            this.bars4h.set(id, c4h);
+          }
           s.breakout = breakoutLevels(c1h, now, BREAKOUT_K);
           next.set(id, s);
         } catch (err) {
