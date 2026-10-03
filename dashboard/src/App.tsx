@@ -9,7 +9,7 @@ import { Setups } from "./Setups";
 import { unlockAudio } from "./sound";
 import { Ticker } from "./Ticker";
 import { Toasts } from "./Toasts";
-import { BEE_META, BEE_NAMES } from "./types";
+import { BEE_META, BEE_NAMES, type BeeName } from "./types";
 import { useFeed } from "./useFeed";
 import { useCollapsed } from "./collapse";
 
@@ -21,20 +21,30 @@ function readSoundPref(): boolean {
   }
 }
 
-type PosFilter = "all" | "flat" | "open" | "benched";
+type PosFilter = "all" | "flat" | "open" | "benched" | "pinned";
 
 function readPosFilter(): PosFilter {
   try {
     const v = localStorage.getItem("bees.posFilter");
-    return v === "flat" || v === "open" || v === "benched" ? v : "all";
+    return v === "flat" || v === "open" || v === "benched" || v === "pinned" ? v : "all";
   } catch {
     return "all";
+  }
+}
+
+function readPinned(): BeeName[] {
+  try {
+    const v = JSON.parse(localStorage.getItem("bees.pinned") ?? "[]") as unknown;
+    return Array.isArray(v) ? (v as string[]).filter((n): n is BeeName => (BEE_NAMES as readonly string[]).includes(n)) : [];
+  } catch {
+    return [];
   }
 }
 
 export function App() {
   const [soundOn, setSoundOn] = useState(false);
   const [posFilter, setPosFilter] = useState<PosFilter>(readPosFilter);
+  const [pinned, setPinned] = useState<BeeName[]>(readPinned);
   const feed = useFeed(soundOn);
   const [, force] = useState(0);
   const [boardCollapsed, boardCollapseBtn] = useCollapsed("board");
@@ -73,6 +83,18 @@ export function App() {
     }
   };
 
+  const togglePin = (name: BeeName) => {
+    setPinned((prev) => {
+      const next = prev.includes(name) ? prev.filter((n) => n !== name) : [...prev, name];
+      try {
+        localStorage.setItem("bees.pinned", JSON.stringify(next));
+      } catch {
+        /* private mode: fine */
+      }
+      return next;
+    });
+  };
+
   const board = [...BEE_NAMES].sort((a, b) => (feed.bees[b]?.equityUsd ?? 0) - (feed.bees[a]?.equityUsd ?? 0));
   // Position filter (All / Flat / Open): display only. Ranks and gaps still
   // measure against the full pack, so filtering never flatters anyone. Fewer
@@ -87,6 +109,7 @@ export function App() {
       case "flat": return !bee?.position && bee?.cap == null;
       case "open": return !!bee?.position;
       case "benched": return bee?.cap != null;
+      case "pinned": return pinned.includes(name);
       default: return true;
     }
   });
@@ -100,9 +123,9 @@ export function App() {
       <Header snap={feed.snap} connected={feed.connected} stalled={stalled} soundOn={soundOn} onSound={toggleSound} />
       <div className="toolbar" role="group" aria-label="Filter wolves by position">
         <span className="dim">showing</span>
-        {(["all", "flat", "open", "benched"] as const).map((f) => (
+        {(["all", "flat", "open", "benched", "pinned"] as const).map((f) => (
           <button key={f} type="button" className="seg" aria-pressed={posFilter === f} onClick={() => pickPosFilter(f)}>
-            {f === "all" ? "All" : f === "flat" ? "Flat" : f === "open" ? "Open" : "Benched"}
+            {f === "all" ? "All" : f === "flat" ? "Flat" : f === "open" ? "Open" : f === "benched" ? "Benched" : "Pinned"}
           </button>
         ))}
         <span className="dim toolbar-count num">
@@ -125,9 +148,14 @@ export function App() {
               flash={feed.flashes[name]}
               fills={feed.fills}
               decisions={feed.decisions}
+              pinned={pinned.includes(name)}
+              onPin={() => togglePin(name)}
             />
           );
         })}
+        {shown.length === 0 && (
+          <p className="dim empty-board">Nothing pinned yet — tap ☆ on a wolf to pin it here.</p>
+        )}
         </div>
         <aside className="rail">
           <section className={`rail-card board${boardCollapsed ? " collapsed" : ""}`}>

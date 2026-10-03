@@ -64,6 +64,8 @@ interface Props {
   flash: FeedState["flashes"][BeeName];
   fills?: FillEvent[];
   decisions?: DecisionEvent[];
+  pinned: boolean;
+  onPin: () => void;
 }
 
 const STYLE_LABEL: Record<string, string> = { bizzy: "Breakout", breezy: "Trend", boozy: "Momentum", scalpy: "Scalp", fade: "Fade", bounce: "Revert", pullback: "Pullback" };
@@ -399,7 +401,7 @@ function EngineHelp({ styleId }: { styleId: string }) {  if (styleId === "breezy
   );
 }
 
-export function BeeColumn({ name, bee, curve, baseline, rank, gap, flash, fills, decisions }: Props) {
+export function BeeColumn({ name, bee, curve, baseline, rank, gap, flash, fills, decisions, pinned, onPin }: Props) {
   const meta = BEE_META[name];
   const p = bee?.position ?? null;
   const flashing = flash && Date.now() - flash.at < 2500;
@@ -460,6 +462,15 @@ export function BeeColumn({ name, bee, curve, baseline, rank, gap, flash, fills,
         <div className="rank">
           <div className="rank-n">#{rank}</div>
           {gap !== null && <div className="rank-gap num">{gap === 0 ? "leading" : `${money(gap)} behind`}</div>}
+          <button
+            type="button"
+            className={`pin-btn${pinned ? " on" : ""}`}
+            aria-pressed={pinned}
+            title={pinned ? `Unpin ${meta.short}` : `Pin ${meta.short}`}
+            onClick={onPin}
+          >
+            {pinned ? "★" : "☆"}
+          </button>
         </div>
       </header>
 

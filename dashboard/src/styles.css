@@ -292,15 +292,19 @@ body,
   border-top: 3px solid var(--bizzy);
   border-radius: var(--radius);
   padding: 1.4rem 1.6rem 1.3rem;
-  font-size: 0.95rem;
+  font-size: 1.1rem;
   line-height: 1.5;
   color: var(--text-2);
 }
 .modal h2 {
   margin: 0 0 0.6rem;
-  font-size: 1.4rem;
+  font-size: 1.6rem;
   color: var(--text);
   letter-spacing: -0.02em;
+}
+/* Popup-only eyebrow bump: the rail cards keep their small caps. */
+.modal .eyebrow {
+  font-size: 0.85rem;
 }
 .modal p {
   margin: 0.5rem 0;
@@ -501,6 +505,29 @@ body,
 .rank {
   text-align: right;
   flex: none;
+}
+/* Pin toggle: quiet outline star, lit in the wolf colour when pinned. */
+.pin-btn {
+  margin-top: 0.3rem;
+  background: none;
+  border: 1px solid var(--line);
+  border-radius: 0.5rem;
+  color: var(--muted);
+  font-size: 1rem;
+  line-height: 1;
+  padding: 0.15rem 0.45rem;
+  cursor: pointer;
+}
+.pin-btn:hover {
+  border-color: var(--bee);
+  color: var(--text);
+}
+.pin-btn.on {
+  border-color: var(--bee);
+  color: var(--bee);
+}
+.empty-board {
+  padding: 1rem 0.5rem;
 }
 .rank-n {
   font-size: 1.9rem;
@@ -1251,7 +1278,7 @@ body,
   align-items: center;
   width: 100%;
   font: inherit;
-  font-size: 0.8rem;
+  font-size: 0.92rem;
   text-align: left;
   color: var(--text);
   background: var(--card-2);
@@ -1277,7 +1304,7 @@ body,
 }
 .fill-side {
   font-family: "JetBrains Mono", ui-monospace, monospace;
-  font-size: 0.68rem;
+  font-size: 0.78rem;
   font-weight: 800;
   letter-spacing: 0.04em;
   padding: 0.1rem 0.32rem;
@@ -1303,7 +1330,7 @@ body,
   white-space: nowrap;
 }
 .fill-purpose {
-  font-size: 0.74rem;
+  font-size: 0.84rem;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1312,14 +1339,14 @@ body,
 .fill-pnl {
   font-family: "JetBrains Mono", ui-monospace, monospace;
   font-weight: 700;
-  font-size: 0.78rem;
+  font-size: 0.9rem;
   text-align: right;
   white-space: nowrap;
 }
 .fill-time {
   text-align: right;
   white-space: nowrap;
-  font-size: 0.74rem;
+  font-size: 0.84rem;
 }
 
 /* ---------- trade modal ---------- */
@@ -1328,7 +1355,7 @@ body,
   grid-template-columns: auto 1fr;
   gap: 0.25rem 1rem;
   margin: 0.6rem 0;
-  font-size: 0.9rem;
+  font-size: 1.02rem;
 }
 .trade-grid dt {
   color: var(--muted);
