@@ -271,6 +271,20 @@ export function trimCoversFee(uplUsd: number, fraction: number, feeUsd: number):
 }
 
 /**
+ * Refine a "stop" close into what actually happened, from the position's stop
+ * history: breakeven (BE fired), trailing (stop moved but never to BE), or
+ * full (untouched initial stop). Falls back to plain "stop" when the entry
+ * stop is unknown (pre-refinement positions). Non-stop reasons pass through.
+ */
+export function stopClosePurpose(p: { beMoved?: boolean; initialStopPx?: number | null; stopPx: number | null }, reason: string): string {
+  if (reason !== "stop") return reason;
+  if (p.beMoved) return "stop_be";
+  if (p.initialStopPx != null && p.stopPx !== p.initialStopPx) return "stop_trail";
+  if (p.initialStopPx != null) return "stop_full";
+  return "stop";
+}
+
+/**
  * Pure take-profit / breakeven signal (per-brain opt-in; never wired here — the engine wires it).
  * Caller owns the one-shot writes: set trimmedAtR when the trim fills, move the stop to
  * entry ± feeBufferR in the position's favour and set beMoved when moveStopToBe fires.

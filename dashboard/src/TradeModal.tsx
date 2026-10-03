@@ -19,6 +19,22 @@ function linkDecision(fill: FillEvent, decisions: DecisionEvent[]): { d: Decisio
 
 const money2 = (x: number) => `$${Math.abs(x).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
+/** Exit reasons in plain words. Every close is coded — there is no manual
+    stop, so the modal names the code that fired. Unknown values pass through. */
+const PURPOSE_WORDS: Record<string, string> = {
+  stop_full: "stop loss (full)",
+  stop_trail: "trailing stop",
+  stop_be: "breakeven stop",
+  stop: "stop",
+  time_stop: "time stop (max hold)",
+  trim: "take-profit trim",
+  switch_close: "Jev switch",
+  experiment_close: "experiment close",
+  open: "open",
+  add: "add",
+};
+const purposeWords = (p: string) => PURPOSE_WORDS[p] ?? p;
+
 /** A fill plus the decision behind it: exact match on decisionId, else the nearest same-bee decision within 60s. */
 export function TradeModal({ fill, decisions, leverage, onClose }: { fill: FillEvent; decisions: DecisionEvent[]; leverage?: { max: number; mode: string }; onClose: () => void }) {
   useEffect(() => {
@@ -56,13 +72,12 @@ export function TradeModal({ fill, decisions, leverage, onClose }: { fill: FillE
             <>
               <dt>p&amp;l</dt>
               <dd className={net >= 0 ? "good" : "bad"}>
-                {net >= 0 ? "+" : "−"}
-                {money2(net).slice(1)}
+                {net >= 0 ? `+${money2(net)}` : `−${money2(net)}`}
               </dd>
             </>
           )}
           <dt>purpose</dt>
-          <dd>{fill.purpose}</dd>
+          <dd>{purposeWords(fill.purpose)}</dd>
           <dt>leverage</dt>
           <dd>{leverage ? `${leverage.max}x ${leverage.mode} (account setting, every trade)` : "–"}</dd>
           <dt>time</dt>

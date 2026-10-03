@@ -19,7 +19,7 @@ import type { MarketFeed } from "./market/data.js";
 import type { MarketView } from "./market/types.js";
 import { createHash } from "node:crypto";
 import { safeError } from "./redact.js";
-import { applyRisk, takeProfitSignal, trimCoversFee, type JevStatus, type Proposal } from "./risk.js";
+import { applyRisk, stopClosePurpose, takeProfitSignal, trimCoversFee, type JevStatus, type Proposal } from "./risk.js";
 import { eligibleSetEqual, enrichEligible, sampleExcluded, screenUniverse, type ScoutEligibleEntry } from "./scout.js";
 import { buildSnapshot } from "./snapshot.js";
 
@@ -1194,7 +1194,8 @@ private filterVenueMenu(menu: Menu, coins: string[]): Menu {
     const p = bee.position;
     switch (action.kind) {
       case "close":
-        if (p) await this.order(id, decisionId, p.instId, p.side === "long" ? "sell" : "buy", p.contracts, true, action.reason);
+        if (!p) return;
+        await this.order(id, decisionId, p.instId, p.side === "long" ? "sell" : "buy", p.contracts, true, stopClosePurpose(p, action.reason));
         return;
       case "trim": {
         if (!p) return;

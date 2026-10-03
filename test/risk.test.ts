@@ -433,3 +433,14 @@ describe("paper venue gates (Alpaca spot: long-only, allowlisted coins)", () => 
     expect(r.vetoedBy ?? "").not.toMatch(/venue_/);
   });
 });
+
+describe("stopClosePurpose", () => {
+  it("names which stop actually fired", async () => {
+    const { stopClosePurpose } = await import("../src/risk.js");
+    expect(stopClosePurpose({ beMoved: true, initialStopPx: 90, stopPx: 100 }, "stop")).toBe("stop_be");
+    expect(stopClosePurpose({ beMoved: false, initialStopPx: 90, stopPx: 95 }, "stop")).toBe("stop_trail");
+    expect(stopClosePurpose({ beMoved: false, initialStopPx: 90, stopPx: 90 }, "stop")).toBe("stop_full");
+    expect(stopClosePurpose({ beMoved: false, initialStopPx: null, stopPx: 95 }, "stop")).toBe("stop");
+    expect(stopClosePurpose({ beMoved: true, initialStopPx: 90, stopPx: 100 }, "time_stop")).toBe("time_stop");
+  });
+});
